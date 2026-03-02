@@ -46,7 +46,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +64,6 @@ fun NotesListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showFabHint by rememberSaveable { mutableStateOf(true) }
 
     var renameTarget by remember { mutableStateOf<NoteMeta?>(null) }
     var deleteTarget by remember { mutableStateOf<NoteMeta?>(null) }
@@ -81,7 +79,13 @@ fun NotesListScreen(
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             if (event is NotesListEvent.ShowMessage) {
-                snackbarHostState.showSnackbar(event.message)
+                val result = snackbarHostState.showSnackbar(
+                    message = event.message,
+                    actionLabel = if (event.allowReselect) "Selecionar pasta" else null
+                )
+                if (event.allowReselect && result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                    folderLauncher.launch(null)
+                }
             }
         }
     }
@@ -128,14 +132,6 @@ fun NotesListScreen(
                 .padding(scaffoldPadding)
                 .padding(16.dp)
         ) {
-            val rootLabel = uiState.rootUri?.lastPathSegment?.substringAfterLast(':').orEmpty()
-            Text(
-                text = "Pasta ativa: ${if (rootLabel.isBlank()) "(desconhecida)" else rootLabel}",
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(Modifier.height(8.dp))
-
             OutlinedTextField(
                 value = uiState.query,
                 onValueChange = viewModel::onQueryChange,
@@ -152,35 +148,16 @@ fun NotesListScreen(
                 )
             )
 
+            Spacer(Modifier.height(8.dp))
+
+            val rootLabel = uiState.rootUri?.lastPathSegment?.substringAfterLast(':').orEmpty()
+            Text(
+                text = "Pasta ativa: ${if (rootLabel.isBlank()) "(desconhecida)" else rootLabel}",
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+            )
+
             Spacer(Modifier.height(16.dp))
-
-            if (showFabHint) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
-                    ),
-                    shape = androidx.compose.material3.MaterialTheme.shapes.medium
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Dica: segure o FAB para escolher tipo de nota.",
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = { showFabHint = false }) {
-                            Text("OK")
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-            }
 
             when {
                 uiState.isLoading -> {
@@ -317,13 +294,15 @@ private fun NoteCard(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = note.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = note.relativePath,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (note.relativePath != note.name) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = note.relativePath,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             IconButton(onClick = { expanded = true }) {
                 Icon(

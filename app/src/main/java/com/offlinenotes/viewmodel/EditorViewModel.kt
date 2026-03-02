@@ -32,7 +32,7 @@ data class EditorUiState(
 )
 
 sealed interface EditorEvent {
-    data class ShowMessage(val message: String) : EditorEvent
+    data class ShowMessage(val message: String, val allowReselect: Boolean = false) : EditorEvent
 }
 
 class EditorViewModel(
@@ -79,7 +79,12 @@ class EditorViewModel(
                     }
                 }
                 .onFailure {
-                    _events.emit(EditorEvent.ShowMessage(it.message ?: "Falha ao salvar"))
+                    _events.emit(
+                        EditorEvent.ShowMessage(
+                            it.message ?: "Falha ao salvar",
+                            allowReselect = isPermissionMessage(it.message)
+                        )
+                    )
                 }
             _uiState.update { it.copy(isSaving = false) }
         }
@@ -104,13 +109,22 @@ class EditorViewModel(
                     _events.emit(EditorEvent.ShowMessage("Nome atualizado"))
                 }
                 .onFailure {
-                    _events.emit(EditorEvent.ShowMessage(it.message ?: "Falha ao renomear"))
+                    _events.emit(
+                        EditorEvent.ShowMessage(
+                            it.message ?: "Falha ao renomear",
+                            allowReselect = isPermissionMessage(it.message)
+                        )
+                    )
                 }
         }
     }
 
     private fun load() {
         viewModelScope.launch {
+            notesRepository.getNoteName(_uiState.value.uri)
+                .onSuccess { name ->
+                    _uiState.update { it.copy(title = name) }
+                }
             notesRepository.readNote(_uiState.value.uri)
                 .onSuccess { content ->
                     _uiState.update {
@@ -123,9 +137,18 @@ class EditorViewModel(
                 }
                 .onFailure {
                     _uiState.update { it.copy(isLoading = false) }
-                    _events.emit(EditorEvent.ShowMessage(it.message ?: "Erro ao abrir nota"))
+                    _events.emit(
+                        EditorEvent.ShowMessage(
+                            it.message ?: "Sem permissao para acessar a pasta. Selecione a pasta novamente.",
+                            allowReselect = isPermissionMessage(it.message)
+                        )
+                    )
                 }
         }
+    }
+
+    private fun isPermissionMessage(message: String?): Boolean {
+        return message.orEmpty().lowercase().contains("permissao")
     }
 
     companion object {

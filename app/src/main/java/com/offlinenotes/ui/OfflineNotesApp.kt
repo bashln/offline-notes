@@ -80,57 +80,60 @@ fun OfflineNotesApp() {
     val currentRoute = currentDestination?.route
 
     val showFab = currentRoute == Routes.NOTES && notesState.rootUri != null
+    val showBottomBar = currentRoute == Routes.NOTES || currentRoute == Routes.SYNC
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(
-                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-                tonalElevation = 2.dp
-            ) {
-                NavigationBarItem(
-                    selected = currentDestination?.hierarchy?.any { it.route == Routes.NOTES } == true,
-                    onClick = {
-                        navController.navigate(Routes.NOTES) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
+            if (showBottomBar) {
+                NavigationBar(
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+                    tonalElevation = 2.dp
+                ) {
+                    NavigationBarItem(
+                        selected = currentDestination?.hierarchy?.any { it.route == Routes.NOTES } == true,
+                        onClick = {
+                            navController.navigate(Routes.NOTES) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    icon = { Icon(Icons.Default.Description, contentDescription = "Notas") },
-                    label = { Text("Notas") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                        selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                        indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                        unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        icon = { Icon(Icons.Default.Description, contentDescription = "Notas") },
+                        label = { Text("Notas") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                            selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                            indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                            unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
-                )
-                NavigationBarItem(
-                    selected = currentDestination?.hierarchy?.any { it.route == Routes.SYNC } == true,
-                    onClick = {
-                        navController.navigate(Routes.SYNC) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
+                    NavigationBarItem(
+                        selected = currentDestination?.hierarchy?.any { it.route == Routes.SYNC } == true,
+                        onClick = {
+                            navController.navigate(Routes.SYNC) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    icon = { Icon(Icons.Default.Cloud, contentDescription = "Sync") },
-                    label = { Text("Sync") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                        selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                        indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                        unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        icon = { Icon(Icons.Default.Cloud, contentDescription = "Sync") },
+                        label = { Text("Sync") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                            selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                            indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                            unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
-                )
+                }
             }
         },
         floatingActionButton = {

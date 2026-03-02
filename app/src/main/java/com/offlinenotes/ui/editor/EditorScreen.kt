@@ -2,25 +2,19 @@ package com.offlinenotes.ui.editor
 
 import android.app.Application
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,6 +25,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -40,16 +36,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.offlinenotes.data.SettingsRepository
 import com.offlinenotes.viewmodel.EditorEvent
 import com.offlinenotes.viewmodel.EditorViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +57,8 @@ fun EditorScreen(
     onBack: () -> Unit
 ) {
     val app = LocalContext.current.applicationContext as Application
+    val settingsRepository = remember(app) { SettingsRepository(app) }
+    val scope = rememberCoroutineScope()
     val viewModel: EditorViewModel = viewModel(
         key = noteUri.toString(),
         factory = EditorViewModel.factory(app, noteUri)
@@ -71,6 +71,23 @@ fun EditorScreen(
         mutableStateOf(uiState.title.removeSuffix(".md").removeSuffix(".org"))
     }
 
+    val folderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val flags =
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            runCatching {
+                app.contentResolver.takePersistableUriPermission(uri, flags)
+            }
+            scope.launch {
+                settingsRepository.saveRootUri(uri)
+                snackbarHostState.showSnackbar("Pasta atualizada")
+            }
+        }
+    }
+
     DisposableEffect(viewModel) {
         onDispose {
             viewModel.saveSilently()
@@ -80,7 +97,13 @@ fun EditorScreen(
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             if (event is EditorEvent.ShowMessage) {
-                snackbarHostState.showSnackbar(event.message)
+                val result = snackbarHostState.showSnackbar(
+                    message = event.message,
+                    actionLabel = if (event.allowReselect) "Re-selecionar" else null
+                )
+                if (event.allowReselect && result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                    folderLauncher.launch(null)
+                }
             }
         }
     }
@@ -140,64 +163,24 @@ fun EditorScreen(
                 .padding(paddingValues)
                 .padding(scaffoldPadding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
+            TextField(
                 value = uiState.text,
                 onValueChange = viewModel::onTextChanged,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                modifier = Modifier.fillMaxSize(),
                 textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
                 placeholder = { Text("Escreva sua nota...") },
-                colors = OutlinedTextFieldDefaults.colors(
+                colors = TextFieldDefaults.colors(
                     focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
                     unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
                     disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                    focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    focusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    unfocusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
                     cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
                 ),
                 shape = androidx.compose.material3.MaterialTheme.shapes.medium
             )
-
-            if (uiState.checklistLines.isNotEmpty()) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    shape = androidx.compose.material3.MaterialTheme.shapes.medium,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("Checklist")
-                        uiState.checklistLines.forEach { item ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(CircleShape)
-                                    .clickable { viewModel.toggleChecklistLine(item.index) }
-                                    .padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (item.checked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                                    contentDescription = null,
-                                    tint = if (item.checked) {
-                                        androidx.compose.material3.MaterialTheme.colorScheme.primary
-                                    } else {
-                                        androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Text(item.text)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 

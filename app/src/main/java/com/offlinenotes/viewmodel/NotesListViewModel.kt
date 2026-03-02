@@ -30,7 +30,7 @@ data class NotesListUiState(
 
 sealed interface NotesListEvent {
     data class OpenEditor(val noteUri: Uri) : NotesListEvent
-    data class ShowMessage(val message: String) : NotesListEvent
+    data class ShowMessage(val message: String, val allowReselect: Boolean = false) : NotesListEvent
 }
 
 class NotesListViewModel(application: Application) : AndroidViewModel(application) {
@@ -65,7 +65,8 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             }.onFailure { error ->
                 _events.emit(
                     NotesListEvent.ShowMessage(
-                        mapStorageError(error, "Nao foi possivel salvar a pasta")
+                        mapStorageError(error, "Nao foi possivel salvar a pasta"),
+                        allowReselect = isPermissionError(error)
                     )
                 )
             }
@@ -85,7 +86,12 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                     _events.emit(NotesListEvent.OpenEditor(createdUri))
                 }
                 .onFailure {
-                    _events.emit(NotesListEvent.ShowMessage(mapStorageError(it, "Falha ao criar nota")))
+                    _events.emit(
+                        NotesListEvent.ShowMessage(
+                            mapStorageError(it, "Falha ao criar nota"),
+                            allowReselect = isPermissionError(it)
+                        )
+                    )
                 }
         }
     }
@@ -103,7 +109,12 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                     refreshNotes(forceReload = true)
                 }
                 .onFailure {
-                    _events.emit(NotesListEvent.ShowMessage(mapStorageError(it, "Falha ao renomear")))
+                    _events.emit(
+                        NotesListEvent.ShowMessage(
+                            mapStorageError(it, "Falha ao renomear"),
+                            allowReselect = isPermissionError(it)
+                        )
+                    )
                 }
         }
     }
@@ -115,7 +126,12 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                     refreshNotes(forceReload = true)
                 }
                 .onFailure {
-                    _events.emit(NotesListEvent.ShowMessage(mapStorageError(it, "Falha ao deletar")))
+                    _events.emit(
+                        NotesListEvent.ShowMessage(
+                            mapStorageError(it, "Falha ao deletar"),
+                            allowReselect = isPermissionError(it)
+                        )
+                    )
                 }
         }
     }
@@ -135,7 +151,11 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                     if (isPermissionError(error)) {
                         clearFolderSelectionWithMessage("Permissao da pasta expirada. Escolha novamente.")
                     } else {
-                        _events.emit(NotesListEvent.ShowMessage(mapStorageError(error, "Erro ao acessar pasta")))
+                        _events.emit(
+                            NotesListEvent.ShowMessage(
+                                mapStorageError(error, "Erro ao acessar pasta")
+                            )
+                        )
                     }
                 }
             } else {
@@ -192,7 +212,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             allNotesCache = emptyList()
             settingsRepository.clearRootUri()
             _uiState.update { it.copy(rootUri = null, isLoading = false, notes = emptyList(), query = "") }
-            _events.emit(NotesListEvent.ShowMessage(message))
+            _events.emit(NotesListEvent.ShowMessage(message, allowReselect = true))
         }
     }
 

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.OfflineNotes" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">#24283b</item>
+        <item name="android:statusBarColor">#24283b</item>
+        <item name="android:navigationBarColor">#24283b</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

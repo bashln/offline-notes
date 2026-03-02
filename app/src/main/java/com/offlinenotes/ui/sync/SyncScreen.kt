@@ -23,7 +23,7 @@ fun SyncScreen(paddingValues: PaddingValues) {
         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Sync") },
+                title = { Text("Ajuda com sync") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
                     titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground

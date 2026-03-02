@@ -13,9 +13,14 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 
 class SettingsRepository(private val context: Context) {
     private val rootUriKey: Preferences.Key<String> = stringPreferencesKey("root_uri")
+    private val defaultNoteFormatKey: Preferences.Key<String> = stringPreferencesKey("default_note_format")
 
     val rootUriFlow: Flow<Uri?> = context.dataStore.data.map { prefs ->
         prefs[rootUriKey]?.let(Uri::parse)
+    }
+
+    val defaultNoteFormatFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[defaultNoteFormatKey] ?: "org"
     }
 
     suspend fun saveRootUri(uri: Uri) {
@@ -27,6 +32,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun clearRootUri() {
         context.dataStore.edit { prefs ->
             prefs.remove(rootUriKey)
+        }
+    }
+
+    suspend fun saveDefaultNoteFormat(value: String) {
+        context.dataStore.edit { prefs ->
+            prefs[defaultNoteFormatKey] = value
         }
     }
 }

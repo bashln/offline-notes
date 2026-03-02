@@ -25,7 +25,8 @@ data class NotesListUiState(
     val rootUri: Uri? = null,
     val isLoading: Boolean = true,
     val query: String = "",
-    val notes: List<NoteMeta> = emptyList()
+    val notes: List<NoteMeta> = emptyList(),
+    val defaultQuickKind: NoteKind = NoteKind.ORG_NOTE
 )
 
 sealed interface NotesListEvent {
@@ -47,6 +48,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
 
     init {
         observeRootFolder()
+        observeDefaultFormat()
     }
 
     fun onQueryChange(value: String) {
@@ -73,12 +75,13 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun createQuickNote(kind: NoteKind = NoteKind.MARKDOWN_NOTE) {
+    fun createQuickNote(kind: NoteKind? = null) {
         val rootUri = _uiState.value.rootUri ?: return
+        val targetKind = kind ?: _uiState.value.defaultQuickKind
         viewModelScope.launch {
-            notesRepository.createQuickNote(rootUri, kind)
+            notesRepository.createQuickNote(rootUri, targetKind)
                 .onSuccess { createdUri ->
-                    if (kind == NoteKind.MARKDOWN_TASKS) {
+                    if (targetKind == NoteKind.MARKDOWN_TASKS) {
                         val content = "- [ ] Item 1\n- [ ] Item 2\n"
                         notesRepository.writeNote(createdUri, content)
                     }
@@ -93,6 +96,18 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                         )
                     )
                 }
+        }
+    }
+
+    fun toggleDefaultQuickFormat() {
+        viewModelScope.launch {
+            val nextKind = if (_uiState.value.defaultQuickKind == NoteKind.ORG_NOTE) {
+                NoteKind.MARKDOWN_NOTE
+            } else {
+                NoteKind.ORG_NOTE
+            }
+            val value = if (nextKind == NoteKind.ORG_NOTE) "org" else "md"
+            settingsRepository.saveDefaultNoteFormat(value)
         }
     }
 
@@ -226,6 +241,15 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun onFolderAccessInvalid() {
         clearFolderSelectionWithMessage("Permissao da pasta expirada. Escolha novamente.")
+    }
+
+    private fun observeDefaultFormat() {
+        viewModelScope.launch {
+            settingsRepository.defaultNoteFormatFlow.collectLatest { value ->
+                val parsed = if (value == "md") NoteKind.MARKDOWN_NOTE else NoteKind.ORG_NOTE
+                _uiState.update { it.copy(defaultQuickKind = parsed) }
+            }
+        }
     }
 
     private fun observeRootFolder() {

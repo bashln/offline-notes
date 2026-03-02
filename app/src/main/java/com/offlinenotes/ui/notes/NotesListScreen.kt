@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -52,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.offlinenotes.domain.NoteKind
 import com.offlinenotes.domain.NoteMeta
 import com.offlinenotes.viewmodel.NotesListEvent
 import com.offlinenotes.viewmodel.NotesListViewModel
@@ -60,13 +62,15 @@ import com.offlinenotes.viewmodel.NotesListViewModel
 @Composable
 fun NotesListScreen(
     paddingValues: PaddingValues,
-    viewModel: NotesListViewModel
+    viewModel: NotesListViewModel,
+    onOpenSyncHelp: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var renameTarget by remember { mutableStateOf<NoteMeta?>(null) }
     var deleteTarget by remember { mutableStateOf<NoteMeta?>(null) }
+    var topMenuExpanded by remember { mutableStateOf(false) }
 
     val folderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -98,11 +102,42 @@ fun NotesListScreen(
                     Text(text = "OfflineNotes")
                 },
                 actions = {
-                    IconButton(onClick = { folderLauncher.launch(null) }) {
+                    IconButton(onClick = { topMenuExpanded = true }) {
                         Icon(
-                            imageVector = Icons.Default.FolderOpen,
-                            contentDescription = "Escolher pasta",
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Menu",
                             tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = topMenuExpanded,
+                        onDismissRequest = { topMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Selecionar pasta") },
+                            onClick = {
+                                topMenuExpanded = false
+                                folderLauncher.launch(null)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Ajuda com sync") },
+                            onClick = {
+                                topMenuExpanded = false
+                                onOpenSyncHelp()
+                            }
+                        )
+                        val formatLabel = if (uiState.defaultQuickKind == NoteKind.ORG_NOTE) {
+                            "Formato padrao: Org"
+                        } else {
+                            "Formato padrao: Markdown"
+                        }
+                        DropdownMenuItem(
+                            text = { Text(formatLabel) },
+                            onClick = {
+                                topMenuExpanded = false
+                                viewModel.toggleDefaultQuickFormat()
+                            }
                         )
                     }
                 },

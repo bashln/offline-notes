@@ -140,7 +140,7 @@ fun OfflineNotesApp() {
             if (showFab) {
                 androidx.compose.foundation.layout.Box {
                     FloatingActionButton(
-                        onClick = { notesViewModel.createQuickNote(NoteKind.MARKDOWN_NOTE) },
+                        onClick = { notesViewModel.createQuickNote() },
                         modifier = Modifier.pointerInput(Unit) {
                             detectTapGestures(onLongPress = { showFabMenu = true })
                         },
@@ -188,7 +188,12 @@ fun OfflineNotesApp() {
             composable(Routes.NOTES) {
                 NotesListScreen(
                     paddingValues = padding,
-                    viewModel = notesViewModel
+                    viewModel = notesViewModel,
+                    onOpenSyncHelp = {
+                        navController.navigate(Routes.SYNC) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable(Routes.SYNC) {

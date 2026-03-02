@@ -33,12 +33,14 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,14 +85,28 @@ fun NotesListScreen(
     }
 
     Scaffold(
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("OfflineNotes") },
+                title = {
+                    Text(
+                        text = "OfflineNotes",
+                        style = androidx.compose.material3.MaterialTheme.typography.titleLarge
+                    )
+                },
                 actions = {
                     IconButton(onClick = { folderLauncher.launch(null) }) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = "Escolher pasta")
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = "Escolher pasta",
+                            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                        )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                    titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+                )
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
@@ -119,7 +135,14 @@ fun NotesListScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                placeholder = { Text("Buscar por nome") }
+                placeholder = { Text("Buscar por nome") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                    focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                )
             )
 
             Spacer(Modifier.height(16.dp))
@@ -135,10 +158,18 @@ fun NotesListScreen(
                 }
 
                 uiState.notes.isEmpty() -> {
-                    Text(
-                        text = "Nenhuma nota encontrada.",
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
+                        ),
+                        shape = androidx.compose.material3.MaterialTheme.shapes.medium
+                    ) {
+                        Text(
+                            text = "Nenhuma nota encontrada.",
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 }
 
                 else -> {
@@ -207,7 +238,10 @@ private fun EmptyFolderState(
     ) {
         Text("Selecione uma pasta para comecar")
         Spacer(Modifier.height(16.dp))
-        FilledTonalButton(onClick = onPickFolder) {
+        FilledTonalButton(
+            onClick = onPickFolder,
+            shape = androidx.compose.material3.MaterialTheme.shapes.medium
+        ) {
             Icon(Icons.Default.FolderOpen, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text("Escolher pasta")
@@ -228,6 +262,8 @@ private fun NoteCard(
         colors = CardDefaults.cardColors(
             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = androidx.compose.material3.MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen)
@@ -238,7 +274,11 @@ private fun NoteCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Description, contentDescription = null)
+            Icon(
+                imageVector = Icons.Default.Description,
+                contentDescription = null,
+                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = note.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -251,7 +291,11 @@ private fun NoteCard(
                 )
             }
             IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Menu",
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 DropdownMenuItem(
@@ -263,7 +307,13 @@ private fun NoteCard(
                 )
                 DropdownMenuItem(
                     text = { Text("Deletar") },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = androidx.compose.material3.MaterialTheme.colorScheme.error
+                        )
+                    },
                     onClick = {
                         expanded = false
                         onDelete()

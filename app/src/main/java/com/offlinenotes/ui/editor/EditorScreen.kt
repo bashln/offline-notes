@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +35,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -79,6 +81,7 @@ fun EditorScreen(
     }
 
     Scaffold(
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text(uiState.title) },
@@ -92,9 +95,17 @@ fun EditorScreen(
                 },
                 actions = {
                     IconButton(onClick = { viewModel.save() }) {
-                        Icon(Icons.Default.Save, contentDescription = "Salvar")
+                        Icon(
+                            Icons.Default.Save,
+                            contentDescription = "Salvar",
+                            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                        )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                    titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+                )
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
@@ -132,7 +143,8 @@ fun EditorScreen(
                 onValueChange = viewModel::onTextChanged,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(340.dp),
+                    .heightIn(min = 320.dp)
+                    .height(360.dp),
                 textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
                 placeholder = { Text("Escreva sua nota...") },
                 colors = OutlinedTextFieldDefaults.colors(
@@ -146,7 +158,9 @@ fun EditorScreen(
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    ),
+                    shape = androidx.compose.material3.MaterialTheme.shapes.medium,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Checklist")

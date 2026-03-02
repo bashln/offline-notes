@@ -11,6 +11,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -76,8 +78,12 @@ fun OfflineNotesApp() {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp
+            ) {
                 NavigationBarItem(
                     selected = currentDestination?.hierarchy?.any { it.route == Routes.NOTES } == true,
                     onClick = {
@@ -90,7 +96,14 @@ fun OfflineNotesApp() {
                         }
                     },
                     icon = { Icon(Icons.Default.Description, contentDescription = "Notas") },
-                    label = { Text("Notas") }
+                    label = { Text("Notas") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                        unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 )
                 NavigationBarItem(
                     selected = currentDestination?.hierarchy?.any { it.route == Routes.SYNC } == true,
@@ -104,13 +117,24 @@ fun OfflineNotesApp() {
                         }
                     },
                     icon = { Icon(Icons.Default.Cloud, contentDescription = "Sync") },
-                    label = { Text("Sync") }
+                    label = { Text("Sync") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                        unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 )
             }
         },
         floatingActionButton = {
             if (showFab) {
-                FloatingActionButton(onClick = { showCreateDialog = true }) {
+                FloatingActionButton(
+                    onClick = { showCreateDialog = true },
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+                ) {
                     Icon(Icons.Default.Edit, contentDescription = "Criar nota")
                 }
             }

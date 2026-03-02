@@ -72,7 +72,7 @@ class NotesRepository(private val context: Context) {
 
             val mimeType = if (extension == ".org") "application/octet-stream" else "text/markdown"
             val file = root.createFile(mimeType, candidate)
-                ?: throw IOException("Nao foi possivel criar a nota")
+                ?: throw IOException("Sem permissao de escrita nesta pasta. Selecione outra pasta.")
 
             if (extension == ".org") {
                 val createdName = file.name.orEmpty()
@@ -82,6 +82,20 @@ class NotesRepository(private val context: Context) {
             }
 
             root.findFile(candidate)?.uri ?: file.uri
+        }
+    }
+
+    suspend fun checkWritableRoot(rootUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        runSafResult("Falha ao validar pasta") {
+            val root = DocumentFile.fromTreeUri(context, rootUri)
+                ?: throw IOException("Pasta raiz invalida")
+
+            val probeName = ".offlinenotes_write_probe_${System.currentTimeMillis()}"
+            val probe = root.createFile("text/plain", probeName)
+                ?: throw IOException("Sem permissao de escrita nesta pasta. Selecione outra pasta.")
+
+            runCatching { probe.delete() }
+            Unit
         }
     }
 

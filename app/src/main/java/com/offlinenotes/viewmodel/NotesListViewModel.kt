@@ -63,6 +63,10 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                     android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
                         android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 getApplication<Application>().contentResolver.takePersistableUriPermission(uri, flags)
+                if (!hasPersistedReadWritePermission(uri)) {
+                    throw SecurityException("Sem permissao de escrita")
+                }
+                notesRepository.checkWritableRoot(uri).getOrThrow()
                 settingsRepository.saveRootUri(uri)
                 allNotesCache = emptyList()
                 _uiState.update { it.copy(rootUri = uri) }
@@ -208,6 +212,10 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
     private fun mapStorageError(error: Throwable, fallback: String): String {
         val message = error.message.orEmpty().lowercase()
         return when {
+            message.contains("escrita") || message.contains("write") -> {
+                "Sem permissao de escrita nesta pasta. Selecione outra pasta."
+            }
+
             isPermissionError(error) -> {
                 "Sem permissao para acessar esta pasta. Escolha novamente."
             }
@@ -236,10 +244,14 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun validateExistingFolderAccess(uri: Uri): Boolean {
         return runCatching {
-            getApplication<Application>().contentResolver.persistedUriPermissions.any {
-                it.uri == uri && (it.isReadPermission || it.isWritePermission)
-            }
+            hasPersistedReadWritePermission(uri)
         }.getOrDefault(false)
+    }
+
+    private fun hasPersistedReadWritePermission(uri: Uri): Boolean {
+        return getApplication<Application>().contentResolver.persistedUriPermissions.any {
+            it.uri == uri && it.isReadPermission && it.isWritePermission
+        }
     }
 
     private fun onFolderAccessInvalid() {
@@ -265,6 +277,11 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
 
                 _uiState.update { it.copy(rootUri = uri) }
                 if (uri != null) {
+                    val writable = notesRepository.checkWritableRoot(uri).isSuccess
+                    if (!writable) {
+                        clearFolderSelectionWithMessage("Sem permissao de escrita nesta pasta. Selecione outra pasta.")
+                        return@collectLatest
+                    }
                     refreshNotes(forceReload = true)
                 } else {
                     allNotesCache = emptyList()

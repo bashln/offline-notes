@@ -19,6 +19,7 @@ Offline-first Android notes app focused on speed and simplicity.
 - Abra o app e toque no menu (hamburger) na tela `Notas`.
 - Toque em `Selecionar pasta`.
 - Escolha uma pasta usando o seletor do Android (SAF).
+- Escolha uma pasta com permissao de escrita (ex.: `Documents/OfflineNotes`).
 - O app salva a permissao persistente para reabrir sem pedir novamente.
 
 ## Formato padrao de novas notas
@@ -29,4 +30,5 @@ Offline-first Android notes app focused on speed and simplicity.
 ## Se der erro de permissao
 - Mensagem esperada: `Sem permissao para acessar a pasta. Selecione a pasta novamente.`
 - Toque em `Selecionar pasta` no aviso e escolha a pasta de novo.
+- Se aparecer erro de escrita, selecione outra pasta onde o app possa criar arquivos.
 - O app usa somente URIs `content://` do SAF para ler e salvar arquivos.

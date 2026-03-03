@@ -1,10 +1,11 @@
 package com.offlinenotes.ui.notes
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
-import android.content.Intent
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,13 +19,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,8 +65,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.offlinenotes.domain.NoteMeta
+import com.offlinenotes.viewmodel.NoteGroupUi
 import com.offlinenotes.viewmodel.NotesListEvent
 import com.offlinenotes.viewmodel.NotesListViewModel
+
+private sealed interface TagTarget {
+    data class Single(val note: NoteMeta) : TagTarget
+    data object Bulk : TagTarget
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +87,9 @@ fun NotesListScreen(
 
     var renameTarget by remember { mutableStateOf<NoteMeta?>(null) }
     var deleteTarget by remember { mutableStateOf<NoteMeta?>(null) }
+    var tagTarget by remember { mutableStateOf<TagTarget?>(null) }
+    var showBulkDeleteConfirm by remember { mutableStateOf(false) }
+
     val folderLauncher = rememberLauncherForActivityResult(
         contract = StartActivityForResult()
     ) { result ->
@@ -110,24 +129,52 @@ fun NotesListScreen(
     Scaffold(
         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(text = "OfflineNotes")
-                },
-                actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Configuracoes",
-                            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
-                    titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+            if (uiState.isSelectionMode) {
+                TopAppBar(
+                    title = { Text("${uiState.selectedUris.size} selecionada(s)") },
+                    navigationIcon = {
+                        IconButton(onClick = viewModel::clearSelectionMode) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancelar selecao")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = viewModel::toggleSelectAllVisible) {
+                            Icon(Icons.Default.SelectAll, contentDescription = "Selecionar tudo")
+                        }
+                        IconButton(onClick = { tagTarget = TagTarget.Bulk }) {
+                            Icon(Icons.Default.Label, contentDescription = "Definir tag")
+                        }
+                        IconButton(onClick = { showBulkDeleteConfirm = true }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Deletar selecionadas",
+                                tint = androidx.compose.material3.MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                        titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+                    )
                 )
-            )
+            } else {
+                TopAppBar(
+                    title = { Text(text = "OfflineNotes") },
+                    actions = {
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Configuracoes",
+                                tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                        titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+                    )
+                )
+            }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { scaffoldPadding ->
@@ -186,7 +233,7 @@ fun NotesListScreen(
                     }
                 }
 
-                uiState.notes.isEmpty() -> {
+                uiState.groupedNotes.isEmpty() -> {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
@@ -206,13 +253,30 @@ fun NotesListScreen(
                         contentPadding = PaddingValues(bottom = 96.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(uiState.notes, key = { it.uri.toString() }) { note ->
-                            NoteCard(
-                                note = note,
-                                onOpen = { viewModel.openNote(note) },
-                                onRename = { renameTarget = note },
-                                onDelete = { deleteTarget = note }
-                            )
+                        uiState.groupedNotes.forEach { group ->
+                            item(key = "group-${group.key}") {
+                                GroupHeader(
+                                    group = group,
+                                    onToggle = { viewModel.toggleGroupExpansion(group.key) }
+                                )
+                            }
+                            if (group.isExpanded) {
+                                items(group.notes, key = { it.uri.toString() }) { note ->
+                                    val noteKey = note.uri.toString()
+                                    val selected = noteKey in uiState.selectedUris
+                                    NoteCard(
+                                        note = note,
+                                        tag = uiState.noteTagsByUri[noteKey],
+                                        isSelectionMode = uiState.isSelectionMode,
+                                        isSelected = selected,
+                                        onTap = { viewModel.onNoteTap(note) },
+                                        onLongPress = { viewModel.onNoteLongPress(note) },
+                                        onRename = { renameTarget = note },
+                                        onDelete = { deleteTarget = note },
+                                        onSetTag = { tagTarget = TagTarget.Single(note) }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -253,6 +317,82 @@ fun NotesListScreen(
             }
         )
     }
+
+    if (showBulkDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBulkDeleteConfirm = false },
+            title = { Text("Deletar notas selecionadas") },
+            text = { Text("Tem certeza que deseja deletar ${uiState.selectedUris.size} nota(s)?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBulkDeleteConfirm = false
+                    viewModel.deleteSelectedNotes()
+                }) {
+                    Text("Deletar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBulkDeleteConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    if (tagTarget != null) {
+        TagDialog(
+            tags = uiState.availableTags,
+            currentTag = when (val target = tagTarget) {
+                is TagTarget.Single -> uiState.noteTagsByUri[target.note.uri.toString()]
+                else -> null
+            },
+            onDismiss = { tagTarget = null },
+            onApply = { tag ->
+                when (val target = tagTarget) {
+                    is TagTarget.Single -> viewModel.setTagForNote(target.note, tag)
+                    is TagTarget.Bulk -> viewModel.setTagForSelected(tag)
+                    null -> Unit
+                }
+                if (!tag.isNullOrBlank()) {
+                    viewModel.saveCustomTag(tag)
+                }
+                tagTarget = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun GroupHeader(
+    group: NoteGroupUi,
+    onToggle: () -> Unit
+) {
+    Card(
+        onClick = onToggle,
+        colors = CardDefaults.cardColors(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = androidx.compose.material3.MaterialTheme.shapes.medium
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "${group.title} (${group.notes.size})",
+                style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                imageVector = if (group.isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable
@@ -278,24 +418,37 @@ private fun EmptyFolderState(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NoteCard(
     note: NoteMeta,
-    onOpen: () -> Unit,
+    tag: String?,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSetTag: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
+            containerColor = if (isSelected) {
+                androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+            } else {
+                androidx.compose.material3.MaterialTheme.colorScheme.surface
+            }
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = androidx.compose.material3.MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onOpen)
+            .combinedClickable(
+                onClick = onTap,
+                onLongClick = onLongPress
+            )
     ) {
         Row(
             modifier = Modifier
@@ -304,40 +457,80 @@ private fun NoteCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Default.Description,
+                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.Description,
                 contentDescription = null,
-                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (isSelected) {
+                    androidx.compose.material3.MaterialTheme.colorScheme.primary
+                } else {
+                    androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                }
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = note.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (note.relativePath != note.name) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = note.relativePath,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                if (!tag.isNullOrBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    AssistChip(
+                        onClick = onSetTag,
+                        label = { Text(tag) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Label,
+                                contentDescription = null,
+                                modifier = Modifier.width(16.dp)
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }
-            IconButton(onClick = { expanded = true }) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Menu",
-                    tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            if (!isSelectionMode) {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Menu",
+                        tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                shape = androidx.compose.material3.MaterialTheme.shapes.medium,
+                tonalElevation = 2.dp
+            ) {
                 DropdownMenuItem(
                     text = { Text("Renomear") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null
+                        )
+                    },
                     onClick = {
                         expanded = false
                         onRename()
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Deletar") },
+                    text = { Text("Definir tag") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Label,
+                            contentDescription = null
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onSetTag()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Deletar", color = androidx.compose.material3.MaterialTheme.colorScheme.error) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Delete,
@@ -356,6 +549,67 @@ private fun NoteCard(
 }
 
 @Composable
+private fun TagDialog(
+    tags: Set<String>,
+    currentTag: String?,
+    onDismiss: () -> Unit,
+    onApply: (String?) -> Unit
+) {
+    var value by remember(currentTag) { mutableStateOf(currentTag.orEmpty()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+        title = { Text("Definir tag") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    singleLine = true,
+                    label = { Text("Tag") },
+                    placeholder = { Text("Ex.: Trabalho") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                        focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
+                        cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                    )
+                )
+                if (tags.isNotEmpty()) {
+                    Text(
+                        text = "Tags existentes",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    tags.sortedBy { it.lowercase() }.forEach { tag ->
+                        TextButton(onClick = { value = tag }) {
+                            Text(tag)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onApply(value.trim().ifBlank { null }) }) {
+                Text("Aplicar")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { onApply(null) }) {
+                    Text("Sem tag")
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancelar")
+                }
+            }
+        }
+    )
+}
+
+@Composable
 private fun RenameDialog(
     note: NoteMeta,
     onDismiss: () -> Unit,
@@ -365,13 +619,22 @@ private fun RenameDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
         title = { Text("Renomear nota") },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
-                placeholder = { Text("novo-nome.md") }
+                placeholder = { Text("novo-nome.md") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                    focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
+                    cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                )
             )
         },
         confirmButton = {

@@ -28,7 +28,20 @@ data class NotesListUiState(
     val isLoading: Boolean = true,
     val query: String = "",
     val notes: List<NoteMeta> = emptyList(),
-    val defaultQuickKind: NoteKind = NoteKind.ORG_NOTE
+    val groupedNotes: List<NoteGroupUi> = emptyList(),
+    val defaultQuickKind: NoteKind = NoteKind.ORG_NOTE,
+    val availableTags: Set<String> = emptySet(),
+    val noteTagsByUri: Map<String, String> = emptyMap(),
+    val collapsedGroups: Set<String> = emptySet(),
+    val isSelectionMode: Boolean = false,
+    val selectedUris: Set<String> = emptySet()
+)
+
+data class NoteGroupUi(
+    val key: String,
+    val title: String,
+    val notes: List<NoteMeta>,
+    val isExpanded: Boolean
 )
 
 sealed interface NotesListEvent {
@@ -52,6 +65,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         observeRootFolder()
         observeDefaultFormat()
+        observeTags()
     }
 
     fun onQueryChange(value: String) {
@@ -124,15 +138,112 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun openNote(noteMeta: NoteMeta) {
+        if (_uiState.value.isSelectionMode) {
+            toggleSelection(noteMeta)
+            return
+        }
         viewModelScope.launch {
             _events.emit(NotesListEvent.OpenEditor(noteMeta.uri))
         }
     }
 
+    fun onNoteLongPress(noteMeta: NoteMeta) {
+        if (!_uiState.value.isSelectionMode) {
+            _uiState.update {
+                it.copy(
+                    isSelectionMode = true,
+                    selectedUris = setOf(noteMeta.uri.toString())
+                )
+            }
+            return
+        }
+        toggleSelection(noteMeta)
+    }
+
+    fun onNoteTap(noteMeta: NoteMeta) {
+        if (_uiState.value.isSelectionMode) {
+            toggleSelection(noteMeta)
+        } else {
+            openNote(noteMeta)
+        }
+    }
+
+    fun clearSelectionMode() {
+        _uiState.update { it.copy(isSelectionMode = false, selectedUris = emptySet()) }
+    }
+
+    fun toggleSelectAllVisible() {
+        val visibleUris = _uiState.value.groupedNotes.flatMap { group -> group.notes }.map { it.uri.toString() }.toSet()
+        if (visibleUris.isEmpty()) return
+        _uiState.update { state ->
+            val allSelected = visibleUris.all { it in state.selectedUris }
+            val next = if (allSelected) {
+                state.selectedUris - visibleUris
+            } else {
+                state.selectedUris + visibleUris
+            }
+            state.copy(
+                selectedUris = next,
+                isSelectionMode = next.isNotEmpty()
+            )
+        }
+    }
+
+    fun deleteSelectedNotes() {
+        val selected = _uiState.value.selectedUris
+        if (selected.isEmpty()) return
+        viewModelScope.launch {
+            val selectedNotes = allNotesCache.filter { it.uri.toString() in selected }
+            selectedNotes.forEach { note ->
+                notesRepository.deleteNote(note.uri)
+                    .onSuccess { settingsRepository.removeNoteTag(note.uri) }
+            }
+            clearSelectionMode()
+            refreshNotes(forceReload = true)
+        }
+    }
+
+    fun setTagForSelected(tag: String?) {
+        val selected = _uiState.value.selectedUris
+        if (selected.isEmpty()) return
+        viewModelScope.launch {
+            settingsRepository.setNoteTagForUris(selected, tag)
+            clearSelectionMode()
+            applyFilterNow()
+        }
+    }
+
+    fun setTagForNote(noteMeta: NoteMeta, tag: String?) {
+        viewModelScope.launch {
+            settingsRepository.setNoteTag(noteMeta.uri, tag)
+            applyFilterNow()
+        }
+    }
+
+    fun saveCustomTag(tag: String) {
+        viewModelScope.launch {
+            settingsRepository.saveCustomTag(tag)
+        }
+    }
+
+    fun toggleGroupExpansion(groupKey: String) {
+        _uiState.update { state ->
+            val next = state.collapsedGroups.toMutableSet()
+            if (groupKey in next) {
+                next.remove(groupKey)
+            } else {
+                next.add(groupKey)
+            }
+            state.copy(collapsedGroups = next)
+        }
+        applyFilterNow()
+    }
+
     fun renameNote(noteMeta: NoteMeta, newName: String) {
         viewModelScope.launch {
             notesRepository.renameNote(noteMeta.uri, newName.trim())
-                .onSuccess {
+                .onSuccess { newUri ->
+                    settingsRepository.migrateNoteTag(noteMeta.uri, newUri)
                     refreshNotes(forceReload = true)
                 }
                 .onFailure {
@@ -150,6 +261,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             notesRepository.deleteNote(noteMeta.uri)
                 .onSuccess {
+                    settingsRepository.removeNoteTag(noteMeta.uri)
                     refreshNotes(forceReload = true)
                 }
                 .onFailure {
@@ -201,15 +313,74 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun applyFilterNow() {
         val query = _uiState.value.query.trim().lowercase()
+        val noteTags = _uiState.value.noteTagsByUri
         val filtered = if (query.isBlank()) {
             allNotesCache
         } else {
             allNotesCache.filter { it.name.lowercase().contains(query) }
         }
+
+        val grouped = buildGroups(
+            notes = filtered,
+            noteTagsByUri = noteTags,
+            collapsedGroups = _uiState.value.collapsedGroups
+        )
+
         _uiState.update {
             it.copy(
                 notes = filtered,
+                groupedNotes = grouped,
                 isLoading = false
+            )
+        }
+    }
+
+    private fun buildGroups(
+        notes: List<NoteMeta>,
+        noteTagsByUri: Map<String, String>,
+        collapsedGroups: Set<String>
+    ): List<NoteGroupUi> {
+        val groupedByTag = notes.groupBy { noteTagsByUri[it.uri.toString()]?.takeIf { tag -> tag.isNotBlank() } }
+        val withTag = groupedByTag.filterKeys { it != null }
+            .toList()
+            .sortedBy { it.first!!.lowercase() }
+            .map { (tag, groupNotes) ->
+                val key = "tag:${tag!!}"
+                NoteGroupUi(
+                    key = key,
+                    title = tag,
+                    notes = groupNotes.sortedWith(compareByDescending<NoteMeta> { it.lastModified ?: Long.MIN_VALUE }.thenBy { it.name.lowercase() }),
+                    isExpanded = key !in collapsedGroups
+                )
+            }
+
+        val untagged = groupedByTag[null].orEmpty()
+        val groups = withTag.toMutableList()
+        if (untagged.isNotEmpty()) {
+            val key = "untagged"
+            groups.add(
+                NoteGroupUi(
+                    key = key,
+                    title = "Sem tag",
+                    notes = untagged.sortedWith(compareByDescending<NoteMeta> { it.lastModified ?: Long.MIN_VALUE }.thenBy { it.name.lowercase() }),
+                    isExpanded = key !in collapsedGroups
+                )
+            )
+        }
+
+        return groups
+    }
+
+    private fun toggleSelection(noteMeta: NoteMeta) {
+        val key = noteMeta.uri.toString()
+        _uiState.update { state ->
+            val next = state.selectedUris.toMutableSet()
+            if (!next.add(key)) {
+                next.remove(key)
+            }
+            state.copy(
+                selectedUris = next,
+                isSelectionMode = next.isNotEmpty()
             )
         }
     }
@@ -272,6 +443,21 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             settingsRepository.defaultNoteFormatFlow.collectLatest { value ->
                 val parsed = if (value == "md") NoteKind.MARKDOWN_NOTE else NoteKind.ORG_NOTE
                 _uiState.update { it.copy(defaultQuickKind = parsed) }
+            }
+        }
+    }
+
+    private fun observeTags() {
+        viewModelScope.launch {
+            settingsRepository.customTagsFlow.collectLatest { tags ->
+                _uiState.update { it.copy(availableTags = tags) }
+            }
+        }
+
+        viewModelScope.launch {
+            settingsRepository.noteTagsFlow.collectLatest { map ->
+                _uiState.update { it.copy(noteTagsByUri = map) }
+                applyFilterNow()
             }
         }
     }

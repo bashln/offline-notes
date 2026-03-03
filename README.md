@@ -15,6 +15,12 @@
 OfflineNotes is an Android notes app built to be simple, private, and offline-first.
 Source of truth is plain text files (`.org` and `.md`) in a user-selected folder.
 
+## Instalacao rapida / Quick install
+
+- GitHub Releases: https://github.com/bashln/bashnotes/releases
+- Baixe / Download: `OfflineNotes-v<versionName>+<versionCode>-release.apk`
+- Android: permita instalacao de fontes desconhecidas / allow unknown sources when prompted
+
 ## PT-BR
 
 ### Visao geral
@@ -36,6 +42,12 @@ Source of truth is plain text files (`.org` and `.md`) in a user-selected folder
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+### Instalacao
+- Download do APK pela pagina de releases do GitHub:
+  https://github.com/bashln/bashnotes/releases
+- Baixe o arquivo mais recente `OfflineNotes-v<versionName>+<versionCode>-release.apk`.
+- Instale no Android e permita instalacao de fontes desconhecidas quando solicitado.
 
 ### Distribuicao via GitHub Releases (APK release)
 ```bash
@@ -93,6 +105,12 @@ Politica completa: veja `PRIVACY.md`.
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+### Installation
+- Download the APK from GitHub Releases:
+  https://github.com/bashln/bashnotes/releases
+- Download the latest `OfflineNotes-v<versionName>+<versionCode>-release.apk` asset.
+- Install it on Android and allow installation from unknown sources when prompted.
 
 ### GitHub Releases distribution (release APK)
 ```bash

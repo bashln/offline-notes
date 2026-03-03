@@ -1,5 +1,7 @@
 # OfflineNotes
 
+![OfflineNotes Banner](https://i.imgur.com/Wvebbw5.png)
+
 <div align="center">
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg?style=for-the-badge)](LICENSE)

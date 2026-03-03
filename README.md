@@ -5,10 +5,10 @@
 <div align="center">
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg?style=for-the-badge)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/bashln/bashnotes?style=for-the-badge)](https://github.com/bashln/bashnotes/stargazers)
-[![Forks](https://img.shields.io/github/forks/bashln/bashnotes?style=for-the-badge)](https://github.com/bashln/bashnotes/network/members)
-[![Issues](https://img.shields.io/github/issues/bashln/bashnotes?style=for-the-badge)](https://github.com/bashln/bashnotes/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/bashln/bashnotes?style=for-the-badge)](https://github.com/bashln/bashnotes/commits/main)
+[![Stars](https://img.shields.io/github/stars/bashln/offline-notes?style=for-the-badge)](https://github.com/bashln/offline-notes/stargazers)
+[![Forks](https://img.shields.io/github/forks/bashln/offline-notes?style=for-the-badge)](https://github.com/bashln/offline-notes/network/members)
+[![Issues](https://img.shields.io/github/issues/bashln/offline-notes?style=for-the-badge)](https://github.com/bashln/offline-notes/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/bashln/offline-notes?style=for-the-badge)](https://github.com/bashln/offline-notes/commits/main)
 
 </div>
 
@@ -17,7 +17,7 @@ Source of truth is plain text files (`.org` and `.md`) in a user-selected folder
 
 ## Instalacao rapida / Quick install
 
-- GitHub Releases: https://github.com/bashln/bashnotes/releases
+- GitHub Releases: https://github.com/bashln/offline-notes/releases
 - Baixe / Download: `OfflineNotes-v<versionName>+<versionCode>-release.apk`
 - Android: permita instalacao de fontes desconhecidas / allow unknown sources when prompted
 
@@ -45,7 +45,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### Instalacao
 - Download do APK pela pagina de releases do GitHub:
-  https://github.com/bashln/bashnotes/releases
+  https://github.com/bashln/offline-notes/releases
 - Baixe o arquivo mais recente `OfflineNotes-v<versionName>+<versionCode>-release.apk`.
 - Instale no Android e permita instalacao de fontes desconhecidas quando solicitado.
 
@@ -108,7 +108,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### Installation
 - Download the APK from GitHub Releases:
-  https://github.com/bashln/bashnotes/releases
+  https://github.com/bashln/offline-notes/releases
 - Download the latest `OfflineNotes-v<versionName>+<versionCode>-release.apk` asset.
 - Install it on Android and allow installation from unknown sources when prompted.
 

@@ -33,3 +33,9 @@ local.properties
 captures/
 .idea/
 *.iml
+
+# Local AI helper docs (must stay untracked)
+[Aa][Gg][Ee][Nn][Tt][Ss].md
+[Cc][Ll][Aa][Uu][Dd][Ee].md
+[Cc][Oo][Dd][Ee][Xx].md
+[Gg][Ee][Mm][Ii][Nn][Ii].md

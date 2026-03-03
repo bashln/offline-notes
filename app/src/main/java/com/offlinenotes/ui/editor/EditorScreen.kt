@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.Save
@@ -71,6 +74,7 @@ fun EditorScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var skipDisposeAutoSave by remember { mutableStateOf(false) }
     var isPreviewMode by rememberSaveable(noteUri.toString()) { mutableStateOf(false) }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val currentExtension = if (uiState.title.endsWith(".org")) ".org" else ".md"
     val isOrgNote = currentExtension == ".org"
     var renameValue by remember(uiState.title) {
@@ -119,6 +123,13 @@ fun EditorScreen(
                 }
             }
         }
+    }
+
+    LaunchedEffect(uiState.editorValue.selection, isPreviewMode) {
+        if (isPreviewMode) {
+            return@LaunchedEffect
+        }
+        bringIntoViewRequester.bringIntoView()
     }
 
     Scaffold(
@@ -203,6 +214,7 @@ fun EditorScreen(
                 .fillMaxSize()
                 .padding(bottom = paddingValues.calculateBottomPadding())
                 .padding(scaffoldPadding)
+                .imePadding()
                 .padding(16.dp),
             contentAlignment = Alignment.TopCenter
         ) {
@@ -222,7 +234,9 @@ fun EditorScreen(
                     TextField(
                         value = uiState.editorValue,
                         onValueChange = viewModel::onEditorValueChange,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .bringIntoViewRequester(bringIntoViewRequester),
                         textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
                         placeholder = { Text("Escreva sua nota...") },
                         colors = TextFieldDefaults.colors(

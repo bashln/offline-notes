@@ -10,9 +10,18 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBackIosNew
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.TextFormat
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -22,21 +31,21 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBackIosNew
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.TextFormat
+import com.offlinenotes.ui.theme.ThemeMode
+import com.offlinenotes.ui.theme.ThemePalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     paddingValues: PaddingValues,
     isOrgDefault: Boolean,
+    currentThemePalette: ThemePalette,
+    currentThemeMode: ThemeMode,
     onBack: () -> Unit,
     onFolderSelected: (Uri, Int) -> Unit,
     onToggleDefaultFormat: () -> Unit,
+    onThemePaletteSelected: (ThemePalette) -> Unit,
+    onThemeModeSelected: (ThemeMode) -> Unit,
     onOpenSyncHelp: () -> Unit,
     onOpenPrivacy: () -> Unit
 ) {
@@ -115,6 +124,36 @@ fun SettingsScreen(
                 onClick = onToggleDefaultFormat
             )
 
+            SettingsChoiceCard(
+                title = "Paleta",
+                subtitle = "Escolha a identidade visual do app"
+            ) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(ThemePalette.entries) { palette ->
+                        FilterChip(
+                            selected = palette == currentThemePalette,
+                            onClick = { onThemePaletteSelected(palette) },
+                            label = { Text(palette.displayName) }
+                        )
+                    }
+                }
+            }
+
+            SettingsChoiceCard(
+                title = "Modo de tema",
+                subtitle = "Force claro, escuro ou siga o sistema"
+            ) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(ThemeMode.entries) { mode ->
+                        FilterChip(
+                            selected = mode == currentThemeMode,
+                            onClick = { onThemeModeSelected(mode) },
+                            label = { Text(mode.displayName) }
+                        )
+                    }
+                }
+            }
+
             SettingsActionCard(
                 title = "Ajuda com sync",
                 subtitle = "Veja como sincronizar usando apps externos",
@@ -140,6 +179,39 @@ fun SettingsScreen(
                 },
                 onClick = onOpenPrivacy
             )
+        }
+    }
+}
+
+@Composable
+private fun SettingsChoiceCard(
+    title: String,
+    subtitle: String,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
+        ),
+        shape = androidx.compose.material3.MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            content()
         }
     }
 }

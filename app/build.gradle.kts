@@ -4,8 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val appVersionCode = 1
-val appVersionName = "0.1.0"
+val appVersionCode = 2
+val appVersionName = "0.2.0"
 
 val releaseKeystorePath: String? = System.getenv("OFFLINENOTES_KEYSTORE_PATH")
 val releaseKeystorePassword: String? = System.getenv("OFFLINENOTES_KEYSTORE_PASSWORD")

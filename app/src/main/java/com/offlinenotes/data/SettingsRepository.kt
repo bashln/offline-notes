@@ -8,7 +8,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.offlinenotes.ui.theme.ThemeMode
+import com.offlinenotes.ui.theme.ThemePalette
+import com.offlinenotes.ui.theme.ThemeSettings
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -18,6 +22,8 @@ class SettingsRepository(private val context: Context) {
     private val defaultNoteFormatKey: Preferences.Key<String> = stringPreferencesKey("default_note_format")
     private val customTagsKey: Preferences.Key<Set<String>> = stringSetPreferencesKey("custom_tags")
     private val noteTagsMapKey: Preferences.Key<Set<String>> = stringSetPreferencesKey("note_tags_map")
+    private val themePaletteKey: Preferences.Key<String> = stringPreferencesKey("theme_palette")
+    private val themeModeKey: Preferences.Key<String> = stringPreferencesKey("theme_mode")
 
     val rootUriFlow: Flow<Uri?> = context.dataStore.data.map { prefs ->
         prefs[rootUriKey]?.let(Uri::parse)
@@ -35,6 +41,18 @@ class SettingsRepository(private val context: Context) {
         decodeNoteTagsMap(prefs[noteTagsMapKey] ?: emptySet())
     }
 
+    val themePaletteFlow: Flow<ThemePalette> = context.dataStore.data.map { prefs ->
+        ThemePalette.fromStorageValue(prefs[themePaletteKey])
+    }
+
+    val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
+        ThemeMode.fromStorageValue(prefs[themeModeKey])
+    }
+
+    val themeSettingsFlow: Flow<ThemeSettings> = combine(themePaletteFlow, themeModeFlow) { palette, mode ->
+        ThemeSettings(palette = palette, mode = mode)
+    }
+
     suspend fun saveRootUri(uri: Uri) {
         context.dataStore.edit { prefs ->
             prefs[rootUriKey] = uri.toString()
@@ -50,6 +68,18 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveDefaultNoteFormat(value: String) {
         context.dataStore.edit { prefs ->
             prefs[defaultNoteFormatKey] = value
+        }
+    }
+
+    suspend fun saveThemePalette(value: ThemePalette) {
+        context.dataStore.edit { prefs ->
+            prefs[themePaletteKey] = value.storageValue
+        }
+    }
+
+    suspend fun saveThemeMode(value: ThemeMode) {
+        context.dataStore.edit { prefs ->
+            prefs[themeModeKey] = value.storageValue
         }
     }
 

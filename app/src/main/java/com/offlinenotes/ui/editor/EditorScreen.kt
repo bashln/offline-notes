@@ -25,7 +25,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -73,6 +72,7 @@ fun EditorScreen(
     var skipDisposeAutoSave by remember { mutableStateOf(false) }
     var isPreviewMode by rememberSaveable(noteUri.toString()) { mutableStateOf(false) }
     val currentExtension = if (uiState.title.endsWith(".org")) ".org" else ".md"
+    val isOrgNote = currentExtension == ".org"
     var renameValue by remember(uiState.title) {
         mutableStateOf(uiState.title.removeSuffix(".md").removeSuffix(".org"))
     }
@@ -214,9 +214,14 @@ fun EditorScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (!isPreviewMode) {
+                    FormattingToolbar(
+                        onAction = { action ->
+                            viewModel.applyFormatting(action = action, isOrg = isOrgNote)
+                        }
+                    )
                     TextField(
-                        value = uiState.text,
-                        onValueChange = viewModel::onTextChanged,
+                        value = uiState.editorValue,
+                        onValueChange = viewModel::onEditorValueChange,
                         modifier = Modifier.fillMaxSize(),
                         textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
                         placeholder = { Text("Escreva sua nota...") },
@@ -232,8 +237,8 @@ fun EditorScreen(
                     )
                 } else {
                     NotePreviewContent(
-                        text = uiState.text,
-                        isOrg = currentExtension == ".org",
+                        text = uiState.editorValue.text,
+                        isOrg = isOrgNote,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(4.dp)

@@ -26,9 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.offlinenotes.ui.theme.TokyoOnSurface
-import com.offlinenotes.ui.theme.TokyoPrimary
-import com.offlinenotes.ui.theme.TokyoSurfaceVariant
 
 private sealed interface PreviewBlock {
     data class Heading(val level: Int, val text: String) : PreviewBlock
@@ -58,7 +55,13 @@ fun NotePreviewContent(
                         else -> MaterialTheme.typography.titleSmall
                     }
                     PreviewText(
-                        text = buildInlineStyledText(block.text, isOrg),
+                        text = buildInlineStyledText(
+                            text = block.text,
+                            isOrg = isOrg,
+                            linkColor = MaterialTheme.colorScheme.primary,
+                            codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+                            codeTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
                         style = headingStyle,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
@@ -89,7 +92,13 @@ fun NotePreviewContent(
                             modifier = Modifier.padding(top = 1.dp)
                         )
                         PreviewText(
-                            text = buildInlineStyledText(block.text, isOrg),
+                            text = buildInlineStyledText(
+                                text = block.text,
+                                isOrg = isOrg,
+                                linkColor = MaterialTheme.colorScheme.primary,
+                                codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+                                codeTextColor = MaterialTheme.colorScheme.onSurface
+                            ),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(start = 8.dp)
@@ -99,7 +108,13 @@ fun NotePreviewContent(
 
                 is PreviewBlock.Bullet -> {
                     PreviewText(
-                        text = buildInlineStyledText("- ${block.text}", isOrg),
+                        text = buildInlineStyledText(
+                            text = "- ${block.text}",
+                            isOrg = isOrg,
+                            linkColor = MaterialTheme.colorScheme.primary,
+                            codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+                            codeTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(
@@ -112,7 +127,13 @@ fun NotePreviewContent(
 
                 is PreviewBlock.Paragraph -> {
                     PreviewText(
-                        text = buildInlineStyledText(block.text, isOrg),
+                        text = buildInlineStyledText(
+                            text = block.text,
+                            isOrg = isOrg,
+                            linkColor = MaterialTheme.colorScheme.primary,
+                            codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+                            codeTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(vertical = 2.dp)
@@ -185,19 +206,31 @@ private fun parsePreviewBlocks(text: String, isOrg: Boolean): List<PreviewBlock>
     }
 }
 
-private fun buildInlineStyledText(text: String, isOrg: Boolean): AnnotatedString {
+private fun buildInlineStyledText(
+    text: String,
+    isOrg: Boolean,
+    linkColor: Color,
+    codeBackground: Color,
+    codeTextColor: Color
+): AnnotatedString {
     val builder = AnnotatedString.Builder()
     var index = 0
 
     while (index < text.length) {
         val nextLink = findNextLinkToken(text, index, isOrg)
         if (nextLink == null) {
-            appendStyledSegment(builder, text.substring(index), isOrg)
+            appendStyledSegment(builder, text.substring(index), isOrg, codeBackground, codeTextColor)
             break
         }
 
         if (nextLink.start > index) {
-            appendStyledSegment(builder, text.substring(index, nextLink.start), isOrg)
+            appendStyledSegment(
+                builder,
+                text.substring(index, nextLink.start),
+                isOrg,
+                codeBackground,
+                codeTextColor
+            )
         }
 
         builder.pushLink(
@@ -205,7 +238,7 @@ private fun buildInlineStyledText(text: String, isOrg: Boolean): AnnotatedString
                 nextLink.url,
                 styles = TextLinkStyles(
                     style = SpanStyle(
-                        color = TokyoPrimary,
+                        color = linkColor,
                         textDecoration = TextDecoration.Underline
                     )
                 )
@@ -223,7 +256,9 @@ private fun buildInlineStyledText(text: String, isOrg: Boolean): AnnotatedString
 private fun appendStyledSegment(
     builder: AnnotatedString.Builder,
     segment: String,
-    isOrg: Boolean
+    isOrg: Boolean,
+    codeBackground: Color,
+    codeTextColor: Color
 ) {
     val boldDelimiter = if (isOrg) "*" else "**"
     val italicDelimiter = if (isOrg) "/" else "_"
@@ -269,8 +304,8 @@ private fun appendStyledSegment(
             italicDelimiter -> SpanStyle(fontStyle = FontStyle.Italic)
             else -> SpanStyle(
                 fontFamily = FontFamily.Monospace,
-                background = TokyoSurfaceVariant,
-                color = TokyoOnSurface
+                background = codeBackground,
+                color = codeTextColor
             )
         }
         builder.withStyle(spanStyle) { append(inner) }

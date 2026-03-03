@@ -2,28 +2,20 @@ package com.offlinenotes.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-
-private val OfflineColorScheme = darkColorScheme(
-    primary = TokyoPrimary,
-    onPrimary = TokyoOnPrimary,
-    background = TokyoBackground,
-    onBackground = TokyoOnBackground,
-    surface = TokyoSurface,
-    onSurface = TokyoOnSurface,
-    surfaceVariant = TokyoSurfaceVariant,
-    onSurfaceVariant = TokyoSecondaryText,
-    outline = TokyoMuted,
-    error = TokyoError
-)
 
 @Composable
 fun OfflineNotesTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    palette: ThemePalette = ThemePalette.TokyoNight,
+    mode: ThemeMode = ThemeMode.System,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) OfflineColorScheme else OfflineColorScheme
+    val darkTheme = when (mode) {
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+        ThemeMode.System -> isSystemInDarkTheme()
+    }
+    val colorScheme = offlineColorScheme(palette = palette, darkTheme = darkTheme)
 
     MaterialTheme(
         colorScheme = colorScheme,

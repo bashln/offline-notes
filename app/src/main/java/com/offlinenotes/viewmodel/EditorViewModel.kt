@@ -2,6 +2,7 @@ package com.offlinenotes.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,7 +26,7 @@ data class ChecklistLine(
 data class EditorUiState(
     val uri: Uri,
     val title: String,
-    val text: String = "",
+    val editorValue: TextFieldValue = TextFieldValue(),
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val checklistLines: List<ChecklistLine> = emptyList()
@@ -56,17 +57,34 @@ class EditorViewModel(
         load()
     }
 
+    fun onEditorValueChange(value: TextFieldValue) {
+        val transformedValue = EditorTextFormatter.applyAutoListContinuation(
+            previousValue = _uiState.value.editorValue,
+            nextValue = value
+        )
+        updateEditorValue(transformedValue)
+    }
+
+    fun applyFormatting(action: FormattingAction, isOrg: Boolean) {
+        val transformedValue = FormattingTextTransformer.apply(_uiState.value.editorValue, action, isOrg)
+        updateEditorValue(transformedValue)
+    }
+
     fun onTextChanged(value: String) {
+        updateEditorValue(_uiState.value.editorValue.copy(text = value))
+    }
+
+    private fun updateEditorValue(value: TextFieldValue) {
         _uiState.update {
             it.copy(
-                text = value,
-                checklistLines = ChecklistTextTransformer.extractChecklistLines(value)
+                editorValue = value,
+                checklistLines = ChecklistTextTransformer.extractChecklistLines(value.text)
             )
         }
     }
 
     fun toggleChecklistLine(lineIndex: Int) {
-        onTextChanged(ChecklistTextTransformer.toggleLine(_uiState.value.text, lineIndex))
+        onTextChanged(ChecklistTextTransformer.toggleLine(_uiState.value.editorValue.text, lineIndex))
     }
 
     fun save(showFeedback: Boolean = true) {
@@ -83,8 +101,11 @@ class EditorViewModel(
     }
 
     private suspend fun saveInternal(showFeedback: Boolean) {
+        if (_uiState.value.isSaving) {
+            return
+        }
         _uiState.update { it.copy(isSaving = true) }
-        notesRepository.writeNote(_uiState.value.uri, _uiState.value.text)
+        notesRepository.writeNote(_uiState.value.uri, _uiState.value.editorValue.text)
             .onSuccess {
                 if (showFeedback) {
                     _events.emit(EditorEvent.ShowMessage("Nota salva"))
@@ -136,7 +157,7 @@ class EditorViewModel(
                 .onSuccess { content ->
                     _uiState.update {
                         it.copy(
-                            text = content,
+                            editorValue = TextFieldValue(text = content),
                             isLoading = false,
                             checklistLines = ChecklistTextTransformer.extractChecklistLines(content)
                         )

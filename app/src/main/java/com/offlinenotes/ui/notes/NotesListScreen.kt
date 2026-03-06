@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
@@ -42,10 +44,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -55,21 +61,30 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.offlinenotes.domain.FileTypeFilter
+import com.offlinenotes.domain.GroupingMode
 import com.offlinenotes.domain.NoteMeta
 import com.offlinenotes.viewmodel.NoteGroupUi
 import com.offlinenotes.viewmodel.NotesListEvent
 import com.offlinenotes.viewmodel.NotesListViewModel
+import kotlinx.coroutines.launch
 
 private sealed interface TagTarget {
     data class Single(val note: NoteMeta) : TagTarget
@@ -86,6 +101,8 @@ fun NotesListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val drawerScope = rememberCoroutineScope()
 
     var renameTarget by remember { mutableStateOf<NoteMeta?>(null) }
     var deleteTarget by remember { mutableStateOf<NoteMeta?>(null) }
@@ -128,155 +145,173 @@ fun NotesListScreen(
         }
     }
 
-    Scaffold(
-        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
-        topBar = {
-            if (uiState.isSelectionMode) {
-                TopAppBar(
-                    title = { Text("${uiState.selectedUris.size} selecionada(s)") },
-                    navigationIcon = {
-                        IconButton(onClick = viewModel::clearSelectionMode) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancelar selecao")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = viewModel::toggleSelectAllVisible) {
-                            Icon(Icons.Default.SelectAll, contentDescription = "Selecionar tudo")
-                        }
-                        IconButton(onClick = { tagTarget = TagTarget.Bulk }) {
-                            Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Definir tag")
-                        }
-                        IconButton(onClick = { showBulkDeleteConfirm = true }) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Deletar selecionadas",
-                                tint = androidx.compose.material3.MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
-                        titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
-                    )
-                )
-            } else {
-                TopAppBar(
-                    title = { Text(text = "OfflineNotes") },
-                    actions = {
-                        IconButton(onClick = onOpenSettings) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Configuracoes",
-                                tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
-                        titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
-                    )
-                )
-            }
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { scaffoldPadding ->
-        if (uiState.rootUri == null) {
-            EmptyFolderState(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = paddingValues.calculateBottomPadding())
-                    .padding(scaffoldPadding),
-                onPickFolder = { launchFolderPicker() }
-            )
-            return@Scaffold
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = paddingValues.calculateBottomPadding())
-                .padding(scaffoldPadding)
-                .padding(16.dp)
-        ) {
-            OutlinedTextField(
-                value = uiState.query,
-                onValueChange = viewModel::onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                placeholder = { Text("Buscar por nome") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                    disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                    focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                    cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                )
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            val rootLabel = uiState.rootUri?.lastPathSegment?.substringAfterLast(':').orEmpty()
-            Text(
-                text = "Pasta ativa: ${if (rootLabel.isBlank()) "(desconhecida)" else rootLabel}",
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            when {
-                uiState.isLoading -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-
-                uiState.groupedNotes.isEmpty() -> {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
-                        ),
-                        shape = androidx.compose.material3.MaterialTheme.shapes.medium
-                    ) {
-                        Text(
-                            text = "Nenhuma nota encontrada.",
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = uiState.rootUri != null && !uiState.isSelectionMode,
+            drawerContent = {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    ModalDrawerSheet {
+                        FiltersDrawerContent(
+                            rootLabel = uiState.rootUri?.lastPathSegment?.substringAfterLast(':').orEmpty(),
+                            query = uiState.query,
+                            groupingMode = uiState.groupingMode,
+                            typeFilter = uiState.typeFilter,
+                            onQueryChange = viewModel::onQueryChange,
+                            onGroupingModeSelected = viewModel::onGroupingModeSelected,
+                            onTypeFilterSelected = viewModel::onTypeFilterSelected,
+                            onClose = {
+                                drawerScope.launch { drawerState.close() }
+                            }
                         )
                     }
                 }
-
-                else -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(bottom = 96.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        uiState.groupedNotes.forEach { group ->
-                            item(key = "group-${group.key}") {
-                                GroupHeader(
-                                    group = group,
-                                    onToggle = { viewModel.toggleGroupExpansion(group.key) }
+            }
+        ) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Scaffold(
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                    topBar = {
+                        if (uiState.isSelectionMode) {
+                            TopAppBar(
+                                title = { Text("${uiState.selectedUris.size} selecionada(s)") },
+                                navigationIcon = {
+                                    IconButton(onClick = viewModel::clearSelectionMode) {
+                                        Icon(Icons.Default.Close, contentDescription = "Cancelar selecao")
+                                    }
+                                },
+                                actions = {
+                                    IconButton(onClick = viewModel::toggleSelectAllVisible) {
+                                        Icon(Icons.Default.SelectAll, contentDescription = "Selecionar tudo")
+                                    }
+                                    IconButton(onClick = { tagTarget = TagTarget.Bulk }) {
+                                        Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Definir tag")
+                                    }
+                                    IconButton(onClick = { showBulkDeleteConfirm = true }) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = "Deletar selecionadas",
+                                            tint = androidx.compose.material3.MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                },
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                                    titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
                                 )
+                            )
+                        } else {
+                            TopAppBar(
+                                title = { Text(text = "OfflineNotes") },
+                                actions = {
+                                    IconButton(
+                                        enabled = uiState.rootUri != null,
+                                        onClick = {
+                                            drawerScope.launch {
+                                                if (drawerState.isClosed) {
+                                                    drawerState.open()
+                                                } else {
+                                                    drawerState.close()
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FilterList,
+                                            contentDescription = "Abrir filtros",
+                                            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    IconButton(onClick = onOpenSettings) {
+                                        Icon(
+                                            imageVector = Icons.Default.Menu,
+                                            contentDescription = "Configuracoes",
+                                            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                },
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                                    titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+                                )
+                            )
+                        }
+                    },
+                    snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+                ) { scaffoldPadding ->
+                    if (uiState.rootUri == null) {
+                        EmptyFolderState(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = paddingValues.calculateBottomPadding())
+                                .padding(scaffoldPadding),
+                            onPickFolder = { launchFolderPicker() }
+                        )
+                        return@Scaffold
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = paddingValues.calculateBottomPadding())
+                            .padding(scaffoldPadding)
+                            .padding(16.dp)
+                    ) {
+                        when {
+                            uiState.isLoading -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    CircularProgressIndicator()
+                                }
                             }
-                            if (group.isExpanded) {
-                                items(group.notes, key = { it.uri.toString() }) { note ->
-                                    val noteKey = note.uri.toString()
-                                    val selected = noteKey in uiState.selectedUris
-                                    NoteCard(
-                                        note = note,
-                                        tag = uiState.noteTagsByUri[noteKey],
-                                        isSelectionMode = uiState.isSelectionMode,
-                                        isSelected = selected,
-                                        onTap = { viewModel.onNoteTap(note) },
-                                        onLongPress = { viewModel.onNoteLongPress(note) },
-                                        onRename = { renameTarget = note },
-                                        onDelete = { deleteTarget = note },
-                                        onSetTag = { tagTarget = TagTarget.Single(note) }
+
+                            uiState.groupedNotes.isEmpty() -> {
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
+                                    ),
+                                    shape = androidx.compose.material3.MaterialTheme.shapes.medium
+                                ) {
+                                    Text(
+                                        text = "Nenhuma nota encontrada.",
+                                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(16.dp)
                                     )
+                                }
+                            }
+
+                            else -> {
+                                LazyColumn(
+                                    contentPadding = PaddingValues(bottom = 96.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    uiState.groupedNotes.forEach { group ->
+                                        item(key = "group-${group.key}") {
+                                            GroupHeader(
+                                                group = group,
+                                                onToggle = { viewModel.toggleGroupExpansion(group.key) }
+                                            )
+                                        }
+                                        if (group.isExpanded) {
+                                            items(group.notes, key = { it.uri.toString() }) { note ->
+                                                val noteKey = note.uri.toString()
+                                                val selected = noteKey in uiState.selectedUris
+                                                NoteCard(
+                                                    note = note,
+                                                    tag = uiState.noteTagsByUri[noteKey],
+                                                    isSelectionMode = uiState.isSelectionMode,
+                                                    isSelected = selected,
+                                                    onTap = { viewModel.onNoteTap(note) },
+                                                    onLongPress = { viewModel.onNoteLongPress(note) },
+                                                    onRename = { renameTarget = note },
+                                                    onDelete = { deleteTarget = note },
+                                                    onSetTag = { tagTarget = TagTarget.Single(note) }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -361,6 +396,100 @@ fun NotesListScreen(
                 tagTarget = null
             }
         )
+    }
+}
+
+@Composable
+private fun FiltersDrawerContent(
+    rootLabel: String,
+    query: String,
+    groupingMode: GroupingMode,
+    typeFilter: FileTypeFilter,
+    onQueryChange: (String) -> Unit,
+    onGroupingModeSelected: (GroupingMode) -> Unit,
+    onTypeFilterSelected: (FileTypeFilter) -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Busca e filtros",
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium
+            )
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, contentDescription = "Fechar filtros")
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = "Pasta ativa: ${if (rootLabel.isBlank()) "(desconhecida)" else rootLabel}",
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            placeholder = { Text("Buscar por nome") },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+            )
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            text = "Agrupar por",
+            style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(6.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(GroupingMode.entries) { mode ->
+                FilterChip(
+                    selected = groupingMode == mode,
+                    onClick = { onGroupingModeSelected(mode) },
+                    label = { Text(mode.displayName) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            text = "Tipo de arquivo",
+            style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(6.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(FileTypeFilter.entries) { filter ->
+                FilterChip(
+                    selected = typeFilter == filter,
+                    onClick = { onTypeFilterSelected(filter) },
+                    label = { Text(filter.displayName) }
+                )
+            }
+        }
     }
 }
 
@@ -470,6 +599,14 @@ private fun NoteCard(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = note.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = note.relativePath,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
                 if (!tag.isNullOrBlank()) {
                     Spacer(Modifier.height(6.dp))
                     AssistChip(

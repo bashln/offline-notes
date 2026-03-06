@@ -7,6 +7,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.offlinenotes.domain.FileTypeFilter
+import com.offlinenotes.domain.GroupingMode
 import com.offlinenotes.data.NotesRepository
 import com.offlinenotes.data.SettingsRepository
 import com.offlinenotes.domain.NoteKind
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -33,6 +36,8 @@ data class NotesListUiState(
     val availableTags: Set<String> = emptySet(),
     val noteTagsByUri: Map<String, String> = emptyMap(),
     val collapsedGroups: Set<String> = emptySet(),
+    val groupingMode: GroupingMode = GroupingMode.BY_TAG,
+    val typeFilter: FileTypeFilter = FileTypeFilter.ALL,
     val isSelectionMode: Boolean = false,
     val selectedUris: Set<String> = emptySet()
 )
@@ -55,6 +60,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
     private val notesRepository = NotesRepository(application)
     private var allNotesCache: List<NoteMeta> = emptyList()
     private var searchJob: Job? = null
+    private var restoredTagsForRootUri: String? = null
 
     private val _uiState = MutableStateFlow(NotesListUiState())
     val uiState: StateFlow<NotesListUiState> = _uiState.asStateFlow()
@@ -66,6 +72,8 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
         observeRootFolder()
         observeDefaultFormat()
         observeTags()
+        observeGroupingPreferences()
+        observeCollapsedGroups()
     }
 
     fun onQueryChange(value: String) {
@@ -198,6 +206,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                 notesRepository.deleteNote(note.uri)
                     .onSuccess { settingsRepository.removeNoteTag(note.uri) }
             }
+            backupTagsForCurrentRoot()
             clearSelectionMode()
             refreshNotes(forceReload = true)
         }
@@ -208,6 +217,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
         if (selected.isEmpty()) return
         viewModelScope.launch {
             settingsRepository.setNoteTagForUris(selected, tag)
+            backupTagsForCurrentRoot()
             clearSelectionMode()
             applyFilterNow()
         }
@@ -216,6 +226,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
     fun setTagForNote(noteMeta: NoteMeta, tag: String?) {
         viewModelScope.launch {
             settingsRepository.setNoteTag(noteMeta.uri, tag)
+            backupTagsForCurrentRoot()
             applyFilterNow()
         }
     }
@@ -227,16 +238,50 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun toggleGroupExpansion(groupKey: String) {
-        _uiState.update { state ->
-            val next = state.collapsedGroups.toMutableSet()
-            if (groupKey in next) {
-                next.remove(groupKey)
+        val nextCollapsed = _uiState.value.collapsedGroups.toMutableSet().apply {
+            if (groupKey in this) {
+                remove(groupKey)
             } else {
-                next.add(groupKey)
+                add(groupKey)
             }
-            state.copy(collapsedGroups = next)
         }
+        _uiState.update { it.copy(collapsedGroups = nextCollapsed) }
         applyFilterNow()
+        viewModelScope.launch {
+            runCatching {
+                settingsRepository.saveCollapsedGroups(nextCollapsed)
+            }.onFailure { error ->
+                Log.w(tag, "Failed to persist collapsed groups", error)
+            }
+        }
+    }
+
+    fun onGroupingModeSelected(value: GroupingMode) {
+        if (value == _uiState.value.groupingMode) return
+        _uiState.update { it.copy(groupingMode = value) }
+        applyFilterNow()
+        viewModelScope.launch {
+            runCatching {
+                settingsRepository.saveGroupingMode(value)
+            }.onFailure { error ->
+                Log.w(tag, "Failed to persist grouping mode", error)
+                _events.emit(NotesListEvent.ShowMessage("Falha ao salvar modo de agrupamento"))
+            }
+        }
+    }
+
+    fun onTypeFilterSelected(value: FileTypeFilter) {
+        if (value == _uiState.value.typeFilter) return
+        _uiState.update { it.copy(typeFilter = value) }
+        applyFilterNow()
+        viewModelScope.launch {
+            runCatching {
+                settingsRepository.saveTypeFilter(value)
+            }.onFailure { error ->
+                Log.w(tag, "Failed to persist type filter", error)
+                _events.emit(NotesListEvent.ShowMessage("Falha ao salvar filtro de tipo"))
+            }
+        }
     }
 
     fun renameNote(noteMeta: NoteMeta, newName: String) {
@@ -244,6 +289,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             notesRepository.renameNote(noteMeta.uri, newName.trim())
                 .onSuccess { newUri ->
                     settingsRepository.migrateNoteTag(noteMeta.uri, newUri)
+                    backupTagsForCurrentRoot()
                     refreshNotes(forceReload = true)
                 }
                 .onFailure {
@@ -262,6 +308,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             notesRepository.deleteNote(noteMeta.uri)
                 .onSuccess {
                     settingsRepository.removeNoteTag(noteMeta.uri)
+                    backupTagsForCurrentRoot()
                     refreshNotes(forceReload = true)
                 }
                 .onFailure {
@@ -314,16 +361,18 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
     private fun applyFilterNow() {
         val query = _uiState.value.query.trim().lowercase()
         val noteTags = _uiState.value.noteTagsByUri
+        val notesByType = applyTypeFilter(allNotesCache, _uiState.value.typeFilter)
         val filtered = if (query.isBlank()) {
-            allNotesCache
+            notesByType
         } else {
-            allNotesCache.filter { it.name.lowercase().contains(query) }
+            notesByType.filter { it.name.lowercase().contains(query) }
         }
 
-        val grouped = buildGroups(
+        val grouped = buildNoteGroups(
             notes = filtered,
             noteTagsByUri = noteTags,
-            collapsedGroups = _uiState.value.collapsedGroups
+            collapsedGroups = _uiState.value.collapsedGroups,
+            groupingMode = _uiState.value.groupingMode
         )
 
         _uiState.update {
@@ -333,42 +382,6 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                 isLoading = false
             )
         }
-    }
-
-    private fun buildGroups(
-        notes: List<NoteMeta>,
-        noteTagsByUri: Map<String, String>,
-        collapsedGroups: Set<String>
-    ): List<NoteGroupUi> {
-        val groupedByTag = notes.groupBy { noteTagsByUri[it.uri.toString()]?.takeIf { tag -> tag.isNotBlank() } }
-        val withTag = groupedByTag.filterKeys { it != null }
-            .toList()
-            .sortedBy { it.first!!.lowercase() }
-            .map { (tag, groupNotes) ->
-                val key = "tag:${tag!!}"
-                NoteGroupUi(
-                    key = key,
-                    title = tag,
-                    notes = groupNotes.sortedWith(compareByDescending<NoteMeta> { it.lastModified ?: Long.MIN_VALUE }.thenBy { it.name.lowercase() }),
-                    isExpanded = key !in collapsedGroups
-                )
-            }
-
-        val untagged = groupedByTag[null].orEmpty()
-        val groups = withTag.toMutableList()
-        if (untagged.isNotEmpty()) {
-            val key = "untagged"
-            groups.add(
-                NoteGroupUi(
-                    key = key,
-                    title = "Sem tag",
-                    notes = untagged.sortedWith(compareByDescending<NoteMeta> { it.lastModified ?: Long.MIN_VALUE }.thenBy { it.name.lowercase() }),
-                    isExpanded = key !in collapsedGroups
-                )
-            )
-        }
-
-        return groups
     }
 
     private fun toggleSelection(noteMeta: NoteMeta) {
@@ -418,8 +431,33 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
 
     private suspend fun resetFolderSelection() {
         allNotesCache = emptyList()
+        restoredTagsForRootUri = null
         settingsRepository.clearRootUri()
         _uiState.update { it.copy(rootUri = null, isLoading = false, notes = emptyList(), query = "") }
+    }
+
+    private suspend fun backupTagsForCurrentRoot() {
+        val rootUri = _uiState.value.rootUri ?: return
+        runCatching {
+            val tagsMap = settingsRepository.noteTagsFlow.first()
+            settingsRepository.backupTagsToFile(rootUri, tagsMap)
+        }.onFailure { error ->
+            Log.w(tag, "Failed to backup tags", error)
+        }
+    }
+
+    private suspend fun restoreTagsIfNeeded(rootUri: Uri) {
+        val rootKey = rootUri.toString()
+        if (restoredTagsForRootUri == rootKey) {
+            return
+        }
+
+        restoredTagsForRootUri = rootKey
+        runCatching {
+            settingsRepository.restoreTagsFromFile(rootUri)
+        }.onFailure { error ->
+            Log.w(tag, "Failed to restore tags from backup", error)
+        }
     }
 
     private fun validateExistingFolderAccess(uri: Uri): Boolean {
@@ -462,6 +500,31 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    private fun observeGroupingPreferences() {
+        viewModelScope.launch {
+            settingsRepository.groupingModeFlow.collectLatest { mode ->
+                _uiState.update { it.copy(groupingMode = mode) }
+                applyFilterNow()
+            }
+        }
+
+        viewModelScope.launch {
+            settingsRepository.typeFilterFlow.collectLatest { typeFilter ->
+                _uiState.update { it.copy(typeFilter = typeFilter) }
+                applyFilterNow()
+            }
+        }
+    }
+
+    private fun observeCollapsedGroups() {
+        viewModelScope.launch {
+            settingsRepository.collapsedGroupsFlow.collectLatest { collapsed ->
+                _uiState.update { it.copy(collapsedGroups = collapsed) }
+                applyFilterNow()
+            }
+        }
+    }
+
     private fun observeRootFolder() {
         viewModelScope.launch {
             settingsRepository.rootUriFlow.collectLatest { uri ->
@@ -477,9 +540,11 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
                         clearFolderSelectionWithMessage("Sem permissao de escrita nesta pasta. Selecione outra pasta.")
                         return@collectLatest
                     }
+                    restoreTagsIfNeeded(uri)
                     refreshNotes(forceReload = true)
                 } else {
                     allNotesCache = emptyList()
+                    restoredTagsForRootUri = null
                     _uiState.update { it.copy(isLoading = false, notes = emptyList()) }
                 }
             }
@@ -496,4 +561,126 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
+}
+
+internal fun applyTypeFilter(
+    notes: List<NoteMeta>,
+    typeFilter: FileTypeFilter
+): List<NoteMeta> {
+    return when (typeFilter) {
+        FileTypeFilter.ALL -> notes
+        FileTypeFilter.ORG -> notes.filter(::isOrgNote)
+        FileTypeFilter.MARKDOWN -> notes.filterNot(::isOrgNote)
+    }
+}
+
+internal fun buildNoteGroups(
+    notes: List<NoteMeta>,
+    noteTagsByUri: Map<String, String>,
+    collapsedGroups: Set<String>,
+    groupingMode: GroupingMode
+): List<NoteGroupUi> {
+    return when (groupingMode) {
+        GroupingMode.BY_TAG -> buildTagGroups(notes, noteTagsByUri, collapsedGroups)
+        GroupingMode.BY_FOLDER -> buildFolderGroups(notes, collapsedGroups)
+        GroupingMode.BY_TYPE -> buildTypeGroups(notes, collapsedGroups)
+    }
+}
+
+private fun buildTagGroups(
+    notes: List<NoteMeta>,
+    noteTagsByUri: Map<String, String>,
+    collapsedGroups: Set<String>
+): List<NoteGroupUi> {
+    val groupedByTag = notes.groupBy { noteTagsByUri[it.uri.toString()]?.takeIf { tag -> tag.isNotBlank() } }
+    val withTag = groupedByTag
+        .filterKeys { it != null }
+        .toList()
+        .sortedBy { it.first!!.lowercase() }
+        .map { (tag, groupNotes) ->
+            val groupKey = "tag:${tag!!}"
+            NoteGroupUi(
+                key = groupKey,
+                title = tag,
+                notes = sortNotes(groupNotes),
+                isExpanded = groupKey !in collapsedGroups
+            )
+        }
+
+    val untagged = groupedByTag[null].orEmpty()
+    if (untagged.isEmpty()) {
+        return withTag
+    }
+
+    val untaggedKey = "untagged"
+    return withTag + NoteGroupUi(
+        key = untaggedKey,
+        title = "Sem tag",
+        notes = sortNotes(untagged),
+        isExpanded = untaggedKey !in collapsedGroups
+    )
+}
+
+private fun buildFolderGroups(
+    notes: List<NoteMeta>,
+    collapsedGroups: Set<String>
+): List<NoteGroupUi> {
+    val grouped = notes.groupBy(::folderGroupKey)
+    return grouped.entries
+        .sortedWith(compareBy<Map.Entry<String, List<NoteMeta>>> { it.key != "folder:root" }.thenBy { folderTitleFromKey(it.key).lowercase() })
+        .map { (groupKey, groupNotes) ->
+            NoteGroupUi(
+                key = groupKey,
+                title = folderTitleFromKey(groupKey),
+                notes = sortNotes(groupNotes),
+                isExpanded = groupKey !in collapsedGroups
+            )
+        }
+}
+
+private fun buildTypeGroups(
+    notes: List<NoteMeta>,
+    collapsedGroups: Set<String>
+): List<NoteGroupUi> {
+    val grouped = notes.groupBy { typeGroupKeyForName(it.name) }
+    val order = listOf("type:org", "type:md")
+    return order.mapNotNull { groupKey ->
+        val groupNotes = grouped[groupKey] ?: return@mapNotNull null
+        val title = if (groupKey == "type:org") "Org" else "Markdown"
+        NoteGroupUi(
+            key = groupKey,
+            title = title,
+            notes = sortNotes(groupNotes),
+            isExpanded = groupKey !in collapsedGroups
+        )
+    }
+}
+
+private fun folderGroupKey(note: NoteMeta): String {
+    return folderGroupKeyForRelativePath(note.relativePath)
+}
+
+private fun folderTitleFromKey(groupKey: String): String {
+    val folderPath = groupKey.removePrefix("folder:")
+    return if (folderPath == "root") "Raiz" else folderPath
+}
+
+private fun sortNotes(notes: List<NoteMeta>): List<NoteMeta> {
+    return notes.sortedWith(
+        compareByDescending<NoteMeta> { it.lastModified ?: Long.MIN_VALUE }
+            .thenBy { it.name.lowercase() }
+    )
+}
+
+private fun isOrgNote(note: NoteMeta): Boolean {
+    return note.name.endsWith(".org", ignoreCase = true)
+}
+
+internal fun folderGroupKeyForRelativePath(relativePath: String): String {
+    val folder = relativePath.substringBeforeLast('/', "")
+    return if (folder.isBlank()) "folder:root" else "folder:$folder"
+}
+
+internal fun typeGroupKeyForName(fileName: String): String {
+    return if (fileName.endsWith(".org", ignoreCase = true)) "type:org" else "type:md"
 }

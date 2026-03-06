@@ -14,6 +14,8 @@ import com.offlinenotes.data.SettingsRepository
 import com.offlinenotes.domain.NoteKind
 import com.offlinenotes.domain.NoteMeta
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +40,7 @@ data class NotesListUiState(
     val collapsedGroups: Set<String> = emptySet(),
     val groupingMode: GroupingMode = GroupingMode.BY_TAG,
     val typeFilter: FileTypeFilter = FileTypeFilter.ALL,
+    val explorerTree: List<ExplorerNode> = emptyList(),
     val isSelectionMode: Boolean = false,
     val selectedUris: Set<String> = emptySet()
 )
@@ -47,6 +50,15 @@ data class NoteGroupUi(
     val title: String,
     val notes: List<NoteMeta>,
     val isExpanded: Boolean
+)
+
+data class ExplorerNode(
+    val name: String,
+    val path: String,
+    val isFolder: Boolean,
+    val children: List<ExplorerNode> = emptyList(),
+    val uri: Uri? = null,
+    val isExpanded: Boolean = false
 )
 
 sealed interface NotesListEvent {
@@ -140,8 +152,7 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             } else {
                 NoteKind.ORG_NOTE
             }
-            val value = if (nextKind == NoteKind.ORG_NOTE) "org" else "md"
-            settingsRepository.saveDefaultNoteFormat(value)
+            settingsRepository.saveDefaultNoteFormat(nextKind)
         }
     }
 
@@ -202,10 +213,12 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
         if (selected.isEmpty()) return
         viewModelScope.launch {
             val selectedNotes = allNotesCache.filter { it.uri.toString() in selected }
-            selectedNotes.forEach { note ->
-                notesRepository.deleteNote(note.uri)
-                    .onSuccess { settingsRepository.removeNoteTag(note.uri) }
-            }
+            selectedNotes.map { note ->
+                async {
+                    notesRepository.deleteNote(note.uri)
+                        .onSuccess { settingsRepository.removeNoteTag(note.uri) }
+                }
+            }.awaitAll()
             backupTagsForCurrentRoot()
             clearSelectionMode()
             refreshNotes(forceReload = true)
@@ -260,26 +273,21 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
         if (value == _uiState.value.groupingMode) return
         _uiState.update { it.copy(groupingMode = value) }
         applyFilterNow()
-        viewModelScope.launch {
-            runCatching {
-                settingsRepository.saveGroupingMode(value)
-            }.onFailure { error ->
-                Log.w(tag, "Failed to persist grouping mode", error)
-                _events.emit(NotesListEvent.ShowMessage("Falha ao salvar modo de agrupamento"))
-            }
-        }
+        persistSetting({ settingsRepository.saveGroupingMode(value) }, "Falha ao salvar modo de agrupamento")
     }
 
     fun onTypeFilterSelected(value: FileTypeFilter) {
         if (value == _uiState.value.typeFilter) return
         _uiState.update { it.copy(typeFilter = value) }
         applyFilterNow()
+        persistSetting({ settingsRepository.saveTypeFilter(value) }, "Falha ao salvar filtro de tipo")
+    }
+
+    private fun persistSetting(persist: suspend () -> Unit, errorMessage: String) {
         viewModelScope.launch {
-            runCatching {
-                settingsRepository.saveTypeFilter(value)
-            }.onFailure { error ->
-                Log.w(tag, "Failed to persist type filter", error)
-                _events.emit(NotesListEvent.ShowMessage("Falha ao salvar filtro de tipo"))
+            runCatching { persist() }.onFailure { error ->
+                Log.w(tag, "Failed to persist setting", error)
+                _events.emit(NotesListEvent.ShowMessage(errorMessage))
             }
         }
     }
@@ -375,10 +383,16 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             groupingMode = _uiState.value.groupingMode
         )
 
+        val explorer = buildExplorerTree(
+            notes = notesByType,
+            collapsedGroups = _uiState.value.collapsedGroups
+        )
+
         _uiState.update {
             it.copy(
                 notes = filtered,
                 groupedNotes = grouped,
+                explorerTree = explorer,
                 isLoading = false
             )
         }
@@ -478,9 +492,8 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun observeDefaultFormat() {
         viewModelScope.launch {
-            settingsRepository.defaultNoteFormatFlow.collectLatest { value ->
-                val parsed = if (value == "md") NoteKind.MARKDOWN_NOTE else NoteKind.ORG_NOTE
-                _uiState.update { it.copy(defaultQuickKind = parsed) }
+            settingsRepository.defaultNoteFormatFlow.collectLatest { kind ->
+                _uiState.update { it.copy(defaultQuickKind = kind) }
             }
         }
     }
@@ -561,6 +574,58 @@ class NotesListViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
+}
+
+internal fun buildExplorerTree(
+    notes: List<NoteMeta>,
+    collapsedGroups: Set<String>
+): List<ExplorerNode> {
+    val tree = mutableMapOf<String, MutableList<NoteMeta>>()
+    notes.forEach { note ->
+        val parent = note.relativePath.substringBeforeLast('/', "")
+        tree.getOrPut(parent) { mutableListOf() }.add(note)
+    }
+
+    val allFolders = tree.keys
+        .filter { it.isNotBlank() }
+        .flatMap { path ->
+            val parts = path.split('/')
+            val folders = mutableListOf<String>()
+            var current = ""
+            for (part in parts) {
+                if (part.isEmpty()) continue
+                current = if (current.isEmpty()) part else "$current/$part"
+                folders.add(current)
+            }
+            folders
+        }.toSet()
+
+    val childrenByParent: Map<String, List<String>> = allFolders.groupBy { it.substringBeforeLast('/', "") }
+    val nodeOrder = compareBy<ExplorerNode> { !it.isFolder }.thenBy { it.name.lowercase() }
+
+    fun buildNode(path: String): ExplorerNode {
+        val name = path.substringAfterLast('/')
+        val groupKey = "folder:$path"
+        val childFolders = childrenByParent[path].orEmpty()
+        val childFiles = tree[path].orEmpty()
+        val children = childFolders.map { buildNode(it) } + childFiles.map {
+            ExplorerNode(it.name, it.relativePath, false, emptyList(), it.uri)
+        }
+        return ExplorerNode(
+            name = name,
+            path = path,
+            isFolder = true,
+            children = children.sortedWith(nodeOrder),
+            isExpanded = groupKey !in collapsedGroups
+        )
+    }
+
+    val rootFolders = childrenByParent[""].orEmpty()
+    val rootFiles = tree[""].orEmpty()
+    val rootNodes = rootFolders.map { buildNode(it) } + rootFiles.map {
+        ExplorerNode(it.name, it.relativePath, false, emptyList(), it.uri)
+    }
+    return rootNodes.sortedWith(nodeOrder)
 }
 
 internal fun applyTypeFilter(

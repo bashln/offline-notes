@@ -22,30 +22,12 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -55,6 +37,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.offlinenotes.ui.theme.ThemePalette
 import com.offlinenotes.viewmodel.EditorEvent
 import com.offlinenotes.viewmodel.EditorViewModel
+import com.offlinenotes.viewmodel.NotesListViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -62,8 +46,10 @@ fun EditorScreen(
     paddingValues: PaddingValues,
     noteUri: Uri,
     palette: ThemePalette,
+    notesViewModel: NotesListViewModel,
     onFolderSelected: (Uri, Int) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToNote: (Uri) -> Unit
 ) {
     val maxEditorWidth = 800.dp
     val actionSlotSize = 48.dp
@@ -78,8 +64,12 @@ fun EditorScreen(
     var skipDisposeAutoSave by remember { mutableStateOf(false) }
     var isPreviewMode by rememberSaveable(noteUri.toString()) { mutableStateOf(false) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val currentExtension = if (uiState.title.endsWith(".org")) ".org" else ".md"
-    val isOrgNote = currentExtension == ".org"
+    
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    
+    val isOrgNote = uiState.title.endsWith(".org")
+    val currentExtension = if (isOrgNote) ".org" else ".md"
     val colorScheme = androidx.compose.material3.MaterialTheme.colorScheme
     val syntaxHighlighting = remember(
         isOrgNote,
@@ -149,133 +139,158 @@ fun EditorScreen(
         bringIntoViewRequester.bringIntoView()
     }
 
-    Scaffold(
-        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = uiState.title,
-                        modifier = Modifier.clickable { showRenameDialog = true }
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        viewModel.saveSilently {
-                            skipDisposeAutoSave = true
-                            onBack()
-                        }
-                    }) {
-                        Icon(Icons.Default.ArrowBackIosNew, contentDescription = "Voltar")
-                    }
-                },
-                actions = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { isPreviewMode = false }) {
-                            Text(
-                                text = "Edit",
-                                color = if (!isPreviewMode) {
-                                    androidx.compose.material3.MaterialTheme.colorScheme.primary
-                                } else {
-                                    androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
-                        TextButton(onClick = { isPreviewMode = true }) {
-                            Text(
-                                text = "View",
-                                color = if (isPreviewMode) {
-                                    androidx.compose.material3.MaterialTheme.colorScheme.primary
-                                } else {
-                                    androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                ExplorerPanel(
+                    viewModel = notesViewModel,
+                    onNoteClick = { uri ->
+                        scope.launch {
+                            drawerState.close()
+                            viewModel.saveSilently {
+                                skipDisposeAutoSave = true
+                                onNavigateToNote(uri)
+                            }
                         }
                     }
-                    Box(modifier = Modifier.size(actionSlotSize), contentAlignment = Alignment.Center) {
-                        if (!isPreviewMode) {
-                        IconButton(onClick = { viewModel.save() }) {
-                            Icon(
-                                imageVector = Icons.Default.Save,
-                                contentDescription = "Salvar",
-                                tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
-                    titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
                 )
-            )
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { scaffoldPadding ->
-        if (uiState.isLoading) {
-            Row(
+            }
+        }
+    ) {
+        Scaffold(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = uiState.title,
+                            modifier = Modifier.clickable { showRenameDialog = true }
+                        )
+                    },
+                    navigationIcon = {
+                        Row {
+                            IconButton(onClick = {
+                                viewModel.saveSilently {
+                                    skipDisposeAutoSave = true
+                                    onBack()
+                                }
+                            }) {
+                                Icon(Icons.Default.ArrowBackIosNew, contentDescription = "Voltar")
+                            }
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(Icons.Default.Folder, contentDescription = "Explorer")
+                            }
+                        }
+                    },
+                    actions = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { isPreviewMode = false }) {
+                                Text(
+                                    text = "Edit",
+                                    color = if (!isPreviewMode) {
+                                        androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                    } else {
+                                        androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                            TextButton(onClick = { isPreviewMode = true }) {
+                                Text(
+                                    text = "View",
+                                    color = if (isPreviewMode) {
+                                        androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                    } else {
+                                        androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+                        Box(modifier = Modifier.size(actionSlotSize), contentAlignment = Alignment.Center) {
+                            if (!isPreviewMode) {
+                                IconButton(onClick = { viewModel.save() }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Save,
+                                        contentDescription = "Salvar",
+                                        tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                        titleContentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+                    )
+                )
+            },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        ) { scaffoldPadding ->
+            if (uiState.isLoading) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = paddingValues.calculateBottomPadding())
+                        .padding(scaffoldPadding),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator()
+                }
+                return@Scaffold
+            }
+
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = paddingValues.calculateBottomPadding())
-                    .padding(scaffoldPadding),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(scaffoldPadding)
+                    .imePadding()
+                    .padding(16.dp),
+                contentAlignment = Alignment.TopCenter
             ) {
-                CircularProgressIndicator()
-            }
-            return@Scaffold
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = paddingValues.calculateBottomPadding())
-                .padding(scaffoldPadding)
-                .imePadding()
-                .padding(16.dp),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .fillMaxWidth()
-                    .widthIn(max = maxEditorWidth),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (!isPreviewMode) {
-                    FormattingToolbar(
-                        onAction = { action ->
-                            viewModel.applyFormatting(action = action, isOrg = isOrgNote)
-                        }
-                    )
-                    TextField(
-                        value = uiState.editorValue,
-                        onValueChange = viewModel::onEditorValueChange,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .bringIntoViewRequester(bringIntoViewRequester),
-                        textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
-                        placeholder = { Text("Escreva sua nota...") },
-                        visualTransformation = syntaxHighlighting,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                            focusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                            unfocusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
-                            cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                        ),
-                        shape = androidx.compose.material3.MaterialTheme.shapes.medium
-                    )
-                } else {
-                    NotePreviewContent(
-                        text = uiState.editorValue.text,
-                        isOrg = isOrgNote,
-                        palette = palette,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(4.dp)
-                    )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .fillMaxWidth()
+                        .widthIn(max = maxEditorWidth),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (!isPreviewMode) {
+                        FormattingToolbar(
+                            onAction = { action ->
+                                viewModel.applyFormatting(action = action, isOrg = isOrgNote)
+                            }
+                        )
+                        TextField(
+                            value = uiState.editorValue,
+                            onValueChange = viewModel::onEditorValueChange,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .bringIntoViewRequester(bringIntoViewRequester),
+                            textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                            placeholder = { Text("Escreva sua nota...") },
+                            visualTransformation = syntaxHighlighting,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                                disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                                focusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                                unfocusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
+                                cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                            ),
+                            shape = androidx.compose.material3.MaterialTheme.shapes.medium
+                        )
+                    } else {
+                        NotePreviewContent(
+                            text = uiState.editorValue.text,
+                            isOrg = isOrgNote,
+                            palette = palette,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(4.dp)
+                        )
+                    }
                 }
             }
         }

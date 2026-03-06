@@ -14,6 +14,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.documentfile.provider.DocumentFile
 import com.offlinenotes.domain.FileTypeFilter
 import com.offlinenotes.domain.GroupingMode
+import com.offlinenotes.domain.NoteKind
 import com.offlinenotes.ui.theme.ThemeMode
 import com.offlinenotes.ui.theme.ThemePalette
 import com.offlinenotes.ui.theme.ThemeSettings
@@ -22,7 +23,6 @@ import java.io.StringReader
 import java.io.StringWriter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -41,13 +41,14 @@ class SettingsRepository(private val context: Context) {
     private val groupingModeKey: Preferences.Key<String> = stringPreferencesKey("grouping_mode")
     private val typeFilterKey: Preferences.Key<String> = stringPreferencesKey("type_filter")
     private val collapsedGroupsKey: Preferences.Key<Set<String>> = stringSetPreferencesKey("collapsed_groups")
+    private val lastOpenedNoteUriKey: Preferences.Key<String> = stringPreferencesKey("last_opened_note_uri")
 
     val rootUriFlow: Flow<Uri?> = context.dataStore.data.map { prefs ->
         prefs[rootUriKey]?.let(Uri::parse)
     }
 
-    val defaultNoteFormatFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[defaultNoteFormatKey] ?: "org"
+    val defaultNoteFormatFlow: Flow<NoteKind> = context.dataStore.data.map { prefs ->
+        if (prefs[defaultNoteFormatKey] == "md") NoteKind.MARKDOWN_NOTE else NoteKind.ORG_NOTE
     }
 
     val customTagsFlow: Flow<Set<String>> = context.dataStore.data.map { prefs ->
@@ -66,8 +67,11 @@ class SettingsRepository(private val context: Context) {
         ThemeMode.fromStorageValue(prefs[themeModeKey])
     }
 
-    val themeSettingsFlow: Flow<ThemeSettings> = combine(themePaletteFlow, themeModeFlow) { palette, mode ->
-        ThemeSettings(palette = palette, mode = mode)
+    val themeSettingsFlow: Flow<ThemeSettings> = context.dataStore.data.map { prefs ->
+        ThemeSettings(
+            palette = ThemePalette.fromStorageValue(prefs[themePaletteKey]),
+            mode = ThemeMode.fromStorageValue(prefs[themeModeKey])
+        )
     }
 
     val groupingModeFlow: Flow<GroupingMode> = context.dataStore.data.map { prefs ->
@@ -82,6 +86,10 @@ class SettingsRepository(private val context: Context) {
         prefs[collapsedGroupsKey]?.filterTo(mutableSetOf()) { it.isNotBlank() } ?: emptySet()
     }
 
+    val lastOpenedNoteUriFlow: Flow<Uri?> = context.dataStore.data.map { prefs ->
+        prefs[lastOpenedNoteUriKey]?.let(Uri::parse)
+    }
+
     suspend fun saveRootUri(uri: Uri) {
         context.dataStore.edit { prefs ->
             prefs[rootUriKey] = uri.toString()
@@ -94,9 +102,9 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
-    suspend fun saveDefaultNoteFormat(value: String) {
+    suspend fun saveDefaultNoteFormat(value: NoteKind) {
         context.dataStore.edit { prefs ->
-            prefs[defaultNoteFormatKey] = value
+            prefs[defaultNoteFormatKey] = if (value == NoteKind.MARKDOWN_NOTE) "md" else "org"
         }
     }
 
@@ -127,6 +135,18 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveCollapsedGroups(value: Set<String>) {
         context.dataStore.edit { prefs ->
             prefs[collapsedGroupsKey] = value.filterTo(mutableSetOf()) { it.isNotBlank() }
+        }
+    }
+
+    suspend fun saveLastOpenedNoteUri(uri: Uri) {
+        context.dataStore.edit { prefs ->
+            prefs[lastOpenedNoteUriKey] = uri.toString()
+        }
+    }
+
+    suspend fun clearLastOpenedNoteUri() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(lastOpenedNoteUriKey)
         }
     }
 
@@ -329,11 +349,11 @@ class SettingsRepository(private val context: Context) {
     }
 
     private fun encodeNoteTagsMap(map: Map<String, String>): Set<String> {
-        return map.map { (uri, tag) ->
+        return map.mapTo(mutableSetOf()) { (uri, tag) ->
             val encodedUri = Base64.encodeToString(uri.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             val encodedTag = Base64.encodeToString(tag.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             "$encodedUri|$encodedTag"
-        }.toSet()
+        }
     }
 
     private fun decodeNoteTagsMap(values: Set<String>): Map<String, String> {

@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -32,6 +35,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -56,7 +61,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val formatLabel = if (isOrgDefault) "Org" else "Markdown"
-    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+    val packageInfo = remember { context.packageManager.getPackageInfo(context.packageName, 0) }
     val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         packageInfo.longVersionCode
     } else {
@@ -107,6 +112,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(bottom = paddingValues.calculateBottomPadding())
                 .padding(scaffoldPadding)
                 .padding(16.dp),
@@ -207,7 +213,7 @@ fun SettingsScreen(
                 onClick = onOpenHelp
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = appVersionLabel,
@@ -238,8 +244,7 @@ private fun SettingsChoiceCard(
         ) {
             Text(
                 text = title,
-                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium
             )
             Text(
                 text = subtitle,
@@ -274,8 +279,7 @@ private fun SettingsActionCard(
             icon()
             Text(
                 text = title,
-                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium
             )
             Text(
                 text = subtitle,

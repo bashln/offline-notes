@@ -7,8 +7,24 @@ import org.junit.Test
 class ThemeSettingsTest {
 
     @Test
-    fun `palette defaults to tokyo night`() {
-        assertEquals(ThemePalette.TokyoNight, ThemePalette.fromStorageValue(null))
+    fun `palette defaults to charcoal`() {
+        assertEquals(ThemePalette.Charcoal, ThemePalette.fromStorageValue(null))
+    }
+
+    @Test
+    fun `existing palette storage values still resolve`() {
+        assertEquals(ThemePalette.TokyoNight, ThemePalette.fromStorageValue("tokyo_night"))
+        assertEquals(ThemePalette.Catppuccin, ThemePalette.fromStorageValue("catppuccin"))
+        assertEquals(ThemePalette.RosePine, ThemePalette.fromStorageValue("rose_pine"))
+        assertEquals(ThemePalette.Obsidianite, ThemePalette.fromStorageValue("obsidianite"))
+        assertEquals(ThemePalette.Charcoal, ThemePalette.fromStorageValue("charcoal"))
+    }
+
+    @Test
+    fun `charcoal dark scheme has warm charcoal background`() {
+        val scheme = offlineColorScheme(ThemePalette.Charcoal, darkTheme = true)
+        assertEquals(CharcoalBackground, scheme.background)
+        assertEquals(CharcoalPrimary, scheme.primary)
     }
 
     @Test

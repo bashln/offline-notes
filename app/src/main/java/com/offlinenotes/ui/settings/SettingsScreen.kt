@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.ArrowBackIosNew
@@ -236,7 +237,11 @@ private fun SettingsChoiceCard(
             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
         ),
         shape = androidx.compose.material3.MaterialTheme.shapes.medium,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -270,7 +275,11 @@ private fun SettingsActionCard(
             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
         ),
         shape = androidx.compose.material3.MaterialTheme.shapes.medium,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp),

@@ -40,10 +40,15 @@ fun FormattingToolbar(
         items(items) { item ->
             AssistChip(
                 onClick = { onAction(item.action) },
-                label = { Text(item.label) },
+                label = {
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                },
                 colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    labelColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
         }

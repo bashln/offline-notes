@@ -272,11 +272,11 @@ fun EditorScreen(
                             placeholder = { Text("Escreva sua nota...") },
                             visualTransformation = syntaxHighlighting,
                             colors = TextFieldDefaults.colors(
-                                focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                                unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                                disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                                focusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                                unfocusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
+                                focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                                unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                                disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                                focusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                                unfocusedIndicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
                                 cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
                             ),
                             shape = androidx.compose.material3.MaterialTheme.shapes.medium

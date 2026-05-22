@@ -7,17 +7,19 @@ internal sealed interface PreviewBlock {
         val text: String,
         val indentLevel: Int
     ) : PreviewBlock
-
     data class Bullet(
         val text: String,
         val indentLevel: Int
     ) : PreviewBlock
-
+    data class NumberedBullet(
+        val number: String,
+        val text: String,
+        val indentLevel: Int
+    ) : PreviewBlock
     data class CodeBlock(
         val languageHint: String?,
         val content: String
     ) : PreviewBlock
-
     data class Blockquote(val text: String) : PreviewBlock
     data object HorizontalRule : PreviewBlock
     data class Paragraph(val text: String) : PreviewBlock
@@ -29,123 +31,134 @@ internal fun parsePreviewBlocks(text: String, isOrg: Boolean): List<PreviewBlock
         return listOf(PreviewBlock.Paragraph("Nota vazia"))
     }
 
-    val headingPattern = if (isOrg) {
-        Regex("^(\\*{1,6})\\s+(.+)$")
-    } else {
-        Regex("^(#{1,6})\\s+(.+)$")
-    }
+    val headingPattern = if (isOrg) Regex("^(\\*{1,6})\\s+(.+)$") else Regex("^(#{1,6})\\s+(.+)$")
     val blockquotePattern = Regex("^>\\s?(.*)")
     val horizontalRulePatternMd = Regex("^\\s*[-*_]{3,}\\s*$")
     val horizontalRulePatternOrg = Regex("^\\s*-{5,}\\s*$")
     val checklistPattern = Regex("^(\\s*)[-+*]\\s+\\[([ xX])]\\s+(.+)$")
+    val orderedListPattern = Regex("^(\\s*)(\\d+[.)])\\s+(.+)$")
     val bulletPattern = Regex("^(\\s*)[-+*]\\s+(.+)$")
     val orgCodeStart = Regex("^\\s*#\\+begin_src(?:\\s+(\\S+))?.*$", RegexOption.IGNORE_CASE)
     val orgCodeEnd = Regex("^\\s*#\\+end_src\\s*$", RegexOption.IGNORE_CASE)
 
     val lines = text.lines()
     val blocks = mutableListOf<PreviewBlock>()
+    val paragraphAccum = mutableListOf<String>()
     var index = 0
 
-    while (index < lines.size) {
-        val rawLine = lines[index]
-        val line = rawLine.trimEnd()
+    fun flushParagraph() {
+        if (paragraphAccum.isNotEmpty()) {
+            blocks += PreviewBlock.Paragraph(paragraphAccum.joinToString("\n"))
+            paragraphAccum.clear()
+        }
+    }
 
-        val markdownCodeStart = line.trimStart().takeIf { it.startsWith("```") }
-        if (!isOrg && markdownCodeStart != null) {
-            val language = markdownCodeStart.removePrefix("```").trim().ifBlank { null }
+    while (index < lines.size) {
+        val line = lines[index].trimEnd()
+
+        // Fenced code blocks (consume multiple lines)
+        val mdCodeStart = if (!isOrg) line.trimStart().takeIf { it.startsWith("```") } else null
+        if (mdCodeStart != null) {
+            flushParagraph()
+            val language = mdCodeStart.removePrefix("```").trim().ifBlank { null }
             val contentLines = mutableListOf<String>()
-            index += 1
+            index++
             while (index < lines.size && !lines[index].trimStart().startsWith("```")) {
                 contentLines += lines[index]
-                index += 1
+                index++
             }
-            if (index < lines.size) {
-                index += 1
-            }
-            blocks += PreviewBlock.CodeBlock(
-                languageHint = language,
-                content = contentLines.joinToString("\n")
-            )
+            if (index < lines.size) index++
+            blocks += PreviewBlock.CodeBlock(languageHint = language, content = contentLines.joinToString("\n"))
             continue
         }
 
         val orgCodeMatch = if (isOrg) orgCodeStart.find(line) else null
-        if (isOrg && orgCodeMatch != null) {
+        if (orgCodeMatch != null) {
+            flushParagraph()
             val language = orgCodeMatch.groupValues.getOrNull(1)?.ifBlank { null }
             val contentLines = mutableListOf<String>()
-            index += 1
-            while (index < lines.size && !orgCodeEnd.matches(lines[index])) {
+            index++
+            while (index < lines.size && !orgCodeEnd.matches(lines[index].trim())) {
                 contentLines += lines[index]
-                index += 1
+                index++
             }
-            if (index < lines.size) {
-                index += 1
-            }
-            blocks += PreviewBlock.CodeBlock(
-                languageHint = language,
-                content = contentLines.joinToString("\n")
-            )
+            if (index < lines.size) index++
+            blocks += PreviewBlock.CodeBlock(languageHint = language, content = contentLines.joinToString("\n"))
             continue
         }
 
         when {
-            line.isBlank() -> blocks += PreviewBlock.Empty
+            line.isBlank() -> {
+                flushParagraph()
+                blocks += PreviewBlock.Empty
+                index++
+            }
+
             headingPattern.matches(line) -> {
-                val match = headingPattern.find(line)!!
-                val level = match.groupValues[1].length
-                val content = match.groupValues[2].trim()
-                blocks += PreviewBlock.Heading(level = level, text = content)
+                flushParagraph()
+                val m = headingPattern.find(line)!!
+                blocks += PreviewBlock.Heading(level = m.groupValues[1].length, text = m.groupValues[2].trim())
+                index++
             }
 
             (!isOrg && horizontalRulePatternMd.matches(line)) ||
                     (isOrg && horizontalRulePatternOrg.matches(line)) -> {
+                flushParagraph()
                 blocks += PreviewBlock.HorizontalRule
+                index++
             }
 
             blockquotePattern.matches(line) -> {
+                flushParagraph()
                 val quoteLines = mutableListOf<String>()
-                var quoteIndex = index
-                while (quoteIndex < lines.size) {
-                    val qMatch = blockquotePattern.find(lines[quoteIndex].trimEnd())
-                    if (qMatch != null) {
-                        quoteLines += qMatch.groupValues[1]
-                        quoteIndex++
-                    } else {
-                        break
-                    }
+                while (index < lines.size) {
+                    val m = blockquotePattern.find(lines[index].trimEnd())
+                    if (m != null) { quoteLines += m.groupValues[1]; index++ } else break
                 }
                 blocks += PreviewBlock.Blockquote(text = quoteLines.joinToString("\n"))
-                index = quoteIndex
                 continue
             }
 
             checklistPattern.matches(line) -> {
-                val match = checklistPattern.find(line)!!
-                val indent = toIndentLevel(match.groupValues[1])
-                val checked = match.groupValues[2].equals("x", ignoreCase = true)
-                val content = match.groupValues[3].trim()
+                flushParagraph()
+                val m = checklistPattern.find(line)!!
                 blocks += PreviewBlock.Checklist(
-                    checked = checked,
-                    text = content,
-                    indentLevel = indent
+                    checked = m.groupValues[2].equals("x", ignoreCase = true),
+                    text = m.groupValues[3].trim(),
+                    indentLevel = toIndentLevel(m.groupValues[1])
                 )
+                index++
+            }
+
+            orderedListPattern.matches(line) -> {
+                flushParagraph()
+                val m = orderedListPattern.find(line)!!
+                blocks += PreviewBlock.NumberedBullet(
+                    number = m.groupValues[2],
+                    text = m.groupValues[3].trim(),
+                    indentLevel = toIndentLevel(m.groupValues[1])
+                )
+                index++
             }
 
             bulletPattern.matches(line) -> {
-                val match = bulletPattern.find(line)!!
-                val indent = toIndentLevel(match.groupValues[1])
+                flushParagraph()
+                val m = bulletPattern.find(line)!!
                 blocks += PreviewBlock.Bullet(
-                    text = match.groupValues[2].trim(),
-                    indentLevel = indent
+                    text = m.groupValues[2].trim(),
+                    indentLevel = toIndentLevel(m.groupValues[1])
                 )
+                index++
             }
 
-            else -> blocks += PreviewBlock.Paragraph(text = line)
+            else -> {
+                paragraphAccum += line
+                index++
+            }
         }
-
-        index += 1
     }
 
+    flushParagraph()
     return blocks
 }
 

@@ -5,7 +5,9 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 val OfflineShapes = Shapes(
-    small = RoundedCornerShape(16.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(20.dp)
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(8.dp),
+    large = RoundedCornerShape(10.dp),
+    extraLarge = RoundedCornerShape(12.dp)
 )

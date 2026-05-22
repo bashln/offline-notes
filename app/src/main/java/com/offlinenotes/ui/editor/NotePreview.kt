@@ -91,6 +91,14 @@ fun NotePreviewContent(
                     }
                 }
 
+                is PreviewBlock.NumberedBullet -> {
+                    if (isObsidianite) {
+                        ObsidianiteNumberedBullet(block = block, isOrg = isOrg, palette = palette)
+                    } else {
+                        StandardNumberedBullet(block = block, isOrg = isOrg, palette = palette)
+                    }
+                }
+
                 is PreviewBlock.Blockquote -> {
                     if (isObsidianite) {
                         ObsidianiteBlockquote(block = block, isOrg = isOrg, palette = palette)
@@ -342,6 +350,64 @@ private fun StandardBullet(block: PreviewBlock.Bullet, isOrg: Boolean, palette: 
                 modifier = Modifier.padding(start = 8.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun StandardNumberedBullet(block: PreviewBlock.NumberedBullet, isOrg: Boolean, palette: ThemePalette) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier.padding(
+            start = (block.indentLevel * 12).dp,
+            top = 3.dp,
+            bottom = 3.dp
+        )
+    ) {
+        Text(
+            text = block.number,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.width(28.dp)
+        )
+        PreviewText(
+            text = buildInlineStyledText(
+                text = block.text,
+                isOrg = isOrg,
+                palette = palette,
+                linkColor = MaterialTheme.colorScheme.primary,
+                codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+                codeTextColor = MaterialTheme.colorScheme.onSurface
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun ObsidianiteNumberedBullet(block: PreviewBlock.NumberedBullet, isOrg: Boolean, palette: ThemePalette) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier.padding(start = (block.indentLevel * 12).dp, top = 4.dp, bottom = 4.dp)
+    ) {
+        Text(
+            text = block.number,
+            style = MaterialTheme.typography.bodyLarge,
+            color = ObsidianiteTextDim,
+            modifier = Modifier.width(28.dp)
+        )
+        PreviewText(
+            text = buildInlineStyledText(
+                text = block.text,
+                isOrg = isOrg,
+                palette = palette,
+                linkColor = ObsidianiteTextLink,
+                codeBackground = ObsidianiteSurface,
+                codeTextColor = ObsidianiteTextNormal
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            color = ObsidianiteTextNormal
+        )
     }
 }
 

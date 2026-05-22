@@ -183,6 +183,68 @@ class PreviewParserTest {
     }
 
     @Test
+    fun parsePreviewBlocks_orderedList_markdown() {
+        val input = "1. First item\n2. Second item\n3. Third item"
+
+        val blocks = parsePreviewBlocks(input, isOrg = false)
+
+        assertEquals(3, blocks.size)
+        assertTrue(blocks.all { it is PreviewBlock.NumberedBullet })
+        assertEquals("1.", (blocks[0] as PreviewBlock.NumberedBullet).number)
+        assertEquals("First item", (blocks[0] as PreviewBlock.NumberedBullet).text)
+        assertEquals(0, (blocks[0] as PreviewBlock.NumberedBullet).indentLevel)
+        assertEquals("3.", (blocks[2] as PreviewBlock.NumberedBullet).number)
+    }
+
+    @Test
+    fun parsePreviewBlocks_orderedList_org_parenthesis() {
+        val input = "1) Item A\n2) Item B"
+
+        val blocks = parsePreviewBlocks(input, isOrg = true)
+
+        assertEquals(2, blocks.size)
+        assertTrue(blocks[0] is PreviewBlock.NumberedBullet)
+        assertEquals("1)", (blocks[0] as PreviewBlock.NumberedBullet).number)
+        assertEquals("Item A", (blocks[0] as PreviewBlock.NumberedBullet).text)
+    }
+
+    @Test
+    fun parsePreviewBlocks_orderedList_indented() {
+        val input = "  1. Indented item"
+
+        val blocks = parsePreviewBlocks(input, isOrg = false)
+
+        assertEquals(1, blocks.size)
+        assertTrue(blocks[0] is PreviewBlock.NumberedBullet)
+        assertEquals(1, (blocks[0] as PreviewBlock.NumberedBullet).indentLevel)
+    }
+
+    @Test
+    fun parsePreviewBlocks_consecutiveLines_grouped() {
+        val input = "Line one\nLine two\nLine three"
+
+        val blocks = parsePreviewBlocks(input, isOrg = false)
+
+        assertEquals(1, blocks.size)
+        assertTrue(blocks[0] is PreviewBlock.Paragraph)
+        assertEquals("Line one\nLine two\nLine three", (blocks[0] as PreviewBlock.Paragraph).text)
+    }
+
+    @Test
+    fun parsePreviewBlocks_blankLine_separatesParagraphs() {
+        val input = "First paragraph\n\nSecond paragraph"
+
+        val blocks = parsePreviewBlocks(input, isOrg = false)
+
+        assertEquals(3, blocks.size)
+        assertTrue(blocks[0] is PreviewBlock.Paragraph)
+        assertEquals("First paragraph", (blocks[0] as PreviewBlock.Paragraph).text)
+        assertTrue(blocks[1] is PreviewBlock.Empty)
+        assertTrue(blocks[2] is PreviewBlock.Paragraph)
+        assertEquals("Second paragraph", (blocks[2] as PreviewBlock.Paragraph).text)
+    }
+
+    @Test
     fun parsePreviewBlocks_mixedContent() {
         val input = """
             # Titulo

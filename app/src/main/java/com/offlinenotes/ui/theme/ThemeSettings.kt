@@ -7,11 +7,12 @@ enum class ThemePalette(
     TokyoNight("tokyo_night", "Tokyo Night"),
     Catppuccin("catppuccin", "Catppuccin"),
     RosePine("rose_pine", "Rose Pine"),
-    Obsidianite("obsidianite", "Obsidianite");
+    Obsidianite("obsidianite", "Obsidianite"),
+    Charcoal("charcoal", "Charcoal");
 
     companion object {
         fun fromStorageValue(value: String?): ThemePalette {
-            return entries.firstOrNull { it.storageValue == value } ?: TokyoNight
+            return entries.firstOrNull { it.storageValue == value } ?: Charcoal
         }
     }
 }
@@ -32,6 +33,6 @@ enum class ThemeMode(
 }
 
 data class ThemeSettings(
-    val palette: ThemePalette = ThemePalette.TokyoNight,
+    val palette: ThemePalette = ThemePalette.Charcoal,
     val mode: ThemeMode = ThemeMode.Dark
 )

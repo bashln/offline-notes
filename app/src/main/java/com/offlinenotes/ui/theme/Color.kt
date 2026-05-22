@@ -37,6 +37,18 @@ val ObsidianiteTableBorder = Color(0x260ED2F7)
 val ObsidianiteOutline = Color(0xFF6E7681)
 val ObsidianiteError = Color(0xFFF4569D)
 
+// Charcoal — warm cinematic minimalism
+val CharcoalBackground = Color(0xFF1A1918)
+val CharcoalSurface = Color(0xFF222120)
+val CharcoalSurfaceVariant = Color(0xFF2B2927)
+val CharcoalPrimary = Color(0xFFBFA082)
+val CharcoalOnPrimary = Color(0xFF1A1918)
+val CharcoalOnBackground = Color(0xFFE0D8CF)
+val CharcoalOnSurface = Color(0xFFD0C8BF)
+val CharcoalOnSurfaceVariant = Color(0xFF7E7368)
+val CharcoalOutline = Color(0xFF4A4540)
+val CharcoalError = Color(0xFFB56B60)
+
 private data class PaletteTokens(
     val primary: Color,
     val onPrimary: Color,
@@ -143,6 +155,32 @@ private val obsidianiteDark = PaletteTokens(
 
 private val obsidianiteLight = obsidianiteDark
 
+private val charcoalDark = PaletteTokens(
+    primary = CharcoalPrimary,
+    onPrimary = CharcoalOnPrimary,
+    background = CharcoalBackground,
+    onBackground = CharcoalOnBackground,
+    surface = CharcoalSurface,
+    onSurface = CharcoalOnSurface,
+    surfaceVariant = CharcoalSurfaceVariant,
+    onSurfaceVariant = CharcoalOnSurfaceVariant,
+    outline = CharcoalOutline,
+    error = CharcoalError
+)
+
+private val charcoalLight = PaletteTokens(
+    primary = Color(0xFF8A6845),
+    onPrimary = Color(0xFFF5F0EA),
+    background = Color(0xFFF2EDE5),
+    onBackground = Color(0xFF2A2520),
+    surface = Color(0xFFFAF6F1),
+    onSurface = Color(0xFF2A2520),
+    surfaceVariant = Color(0xFFEDE8E2),
+    onSurfaceVariant = Color(0xFF6A5F55),
+    outline = Color(0xFFB0A89D),
+    error = Color(0xFF9B3D35)
+)
+
 fun offlineColorScheme(
     palette: ThemePalette,
     darkTheme: Boolean
@@ -152,6 +190,7 @@ fun offlineColorScheme(
         ThemePalette.Catppuccin -> if (darkTheme) catppuccinDark else catppuccinLight
         ThemePalette.RosePine -> if (darkTheme) rosePineDark else rosePineLight
         ThemePalette.Obsidianite -> if (darkTheme) obsidianiteDark else obsidianiteLight
+        ThemePalette.Charcoal -> if (darkTheme) charcoalDark else charcoalLight
     }
 
     return if (darkTheme) {

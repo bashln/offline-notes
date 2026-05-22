@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -285,7 +286,7 @@ fun NotesListScreen(
                             else -> {
                                 LazyColumn(
                                     contentPadding = PaddingValues(bottom = 96.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     uiState.groupedNotes.forEach { group ->
                                         item(key = "group-${group.key}") {
@@ -501,27 +502,39 @@ private fun GroupHeader(
     Card(
         onClick = onToggle,
         colors = CardDefaults.cardColors(
-            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background
         ),
-        shape = androidx.compose.material3.MaterialTheme.shapes.medium
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = androidx.compose.material3.MaterialTheme.shapes.small
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 4.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "${group.title} (${group.notes.size})",
-                style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+                text = group.title,
+                style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
                 color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Icon(
-                imageVector = if (group.isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "${group.notes.size}",
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.outline
+                )
+                Icon(
+                    imageVector = if (group.isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
         }
     }
 }
@@ -532,12 +545,16 @@ private fun EmptyFolderState(
     onPickFolder: () -> Unit
 ) {
     Column(
-        modifier = modifier.padding(24.dp),
+        modifier = modifier.padding(40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Selecione uma pasta para comecar")
-        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "Selecione uma pasta para comecar",
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(24.dp))
         FilledTonalButton(
             onClick = onPickFolder,
             shape = androidx.compose.material3.MaterialTheme.shapes.medium
@@ -572,7 +589,15 @@ private fun NoteCard(
                 androidx.compose.material3.MaterialTheme.colorScheme.surface
             }
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isSelected) {
+                androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            } else {
+                androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+            }
+        ),
         shape = androidx.compose.material3.MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()

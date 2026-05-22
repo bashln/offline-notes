@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 
 @Composable
 fun OfflineNotesTheme(
-    palette: ThemePalette = ThemePalette.TokyoNight,
+    palette: ThemePalette = ThemePalette.Charcoal,
     mode: ThemeMode = ThemeMode.System,
     content: @Composable () -> Unit
 ) {

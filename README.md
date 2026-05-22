@@ -5,10 +5,10 @@
 <div align="center">
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg?style=for-the-badge)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/paesmont/offline-notes?style=for-the-badge)](https://github.com/paesmont/offline-notes/stargazers)
-[![Forks](https://img.shields.io/github/forks/paesmont/offline-notes?style=for-the-badge)](https://github.com/paesmont/offline-notes/network/members)
-[![Issues](https://img.shields.io/github/issues/paesmont/offline-notes?style=for-the-badge)](https://github.com/paesmont/offline-notes/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/paesmont/offline-notes?style=for-the-badge)](https://github.com/paesmont/offline-notes/commits/main)
+[![Stars](https://img.shields.io/github/stars/leonamduarte/offline-notes?style=for-the-badge)](https://github.com/leonamduarte/offline-notes/stargazers)
+[![Forks](https://img.shields.io/github/forks/leonamduarte/offline-notes?style=for-the-badge)](https://github.com/leonamduarte/offline-notes/network/members)
+[![Issues](https://img.shields.io/github/issues/leonamduarte/offline-notes?style=for-the-badge)](https://github.com/leonamduarte/offline-notes/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/leonamduarte/offline-notes?style=for-the-badge)](https://github.com/leonamduarte/offline-notes/commits/main)
 
 </div>
 
@@ -23,7 +23,7 @@ EN: I honestly built this project to solve a personal need of mine: a simple, pr
 
 ## Instalacao rapida / Quick install
 
-- GitHub Releases: https://github.com/paesmont/offline-notes/releases
+- GitHub Releases: https://github.com/leonamduarte/offline-notes/releases
 - Baixe / Download: `OfflineNotes-v<versionName>+<versionCode>-release.apk`
 - Android: permita instalacao de fontes desconhecidas / allow unknown sources when prompted
 - Auto-update opcional / Optional auto-update: Obtainium (rastreando este repo / tracking this repo)
@@ -52,13 +52,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### Instalacao
 - Download do APK pela pagina de releases do GitHub:
-  https://github.com/paesmont/offline-notes/releases
+  https://github.com/leonamduarte/offline-notes/releases
 - Baixe o arquivo mais recente `OfflineNotes-v<versionName>+<versionCode>-release.apk`.
 - Instale no Android e permita instalacao de fontes desconhecidas quando solicitado.
 
 ### Atualizacoes via Obtainium (opcional)
 - Instale o app Obtainium no seu Android.
-- Adicione este repositorio: `https://github.com/paesmont/offline-notes`.
+- Adicione este repositorio: `https://github.com/leonamduarte/offline-notes`.
 - Configure para acompanhar Releases estaveis (sem pre-release).
 - O Obtainium baixa e avisa sobre novas versoes publicadas.
 - O OfflineNotes continua sem conexao externa para o fluxo de notas.
@@ -123,13 +123,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### Installation
 - Download the APK from GitHub Releases:
-  https://github.com/paesmont/offline-notes/releases
+  https://github.com/leonamduarte/offline-notes/releases
 - Download the latest `OfflineNotes-v<versionName>+<versionCode>-release.apk` asset.
 - Install it on Android and allow installation from unknown sources when prompted.
 
 ### Updates via Obtainium (optional)
 - Install the Obtainium app on your Android device.
-- Add this repository: `https://github.com/paesmont/offline-notes`.
+- Add this repository: `https://github.com/leonamduarte/offline-notes`.
 - Track stable releases (pre-release disabled).
 - Obtainium will detect and notify/download new published versions.
 - OfflineNotes itself remains offline for the notes workflow.

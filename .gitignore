@@ -34,11 +34,21 @@ captures/
 .idea/
 *.iml
 
-# Local AI helper docs (must stay untracked)
+# AI assistant working directories
+.claude/
+
+# AI planning and context docs (local-only)
 [Aa][Gg][Ee][Nn][Tt][Ss].md
 [Cc][Ll][Aa][Uu][Dd][Ee].md
 [Cc][Oo][Dd][Ee][Xx].md
 [Gg][Ee][Mm][Ii][Nn][Ii].md
+IMPLEMENTATION_PLAN.md
+architecture-decisions.md
+blueprints.md
+current-state.md
+
+# Accidental files
+package-lock.json
 
 # Keystores and signing material
 *.jks

@@ -6,8 +6,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val appVersionCode = 9
-val appVersionName = "0.5.1"
+val appVersionCode = 10
+val appVersionName = "0.6.0"
 val buildDate = System.getenv("OFFLINENOTES_BUILD_DATE") ?: LocalDate.now().toString()
 
 val releaseKeystorePath: String? = System.getenv("OFFLINENOTES_KEYSTORE_PATH")

@@ -75,7 +75,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -629,8 +628,7 @@ private fun NoteCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (!tag.isNullOrBlank()) {
                     Spacer(Modifier.height(6.dp))

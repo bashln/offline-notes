@@ -1,5 +1,6 @@
 package com.offlinenotes.ui.sync
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,7 +45,11 @@ fun SyncScreen(paddingValues: PaddingValues) {
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
                 ),
                 shape = androidx.compose.material3.MaterialTheme.shapes.medium,
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                )
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
